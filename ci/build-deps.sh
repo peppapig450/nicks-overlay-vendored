@@ -33,11 +33,11 @@ trap 'logging::trap_err_handler' ERR
 
 # Verifies that our commands are available on path and our environment is correct
 check_requirements() {
-    for cmd in "${REQUIRED_CMDS[@]}"; do
-        if ! command -v "${cmd}" >/dev/null 2>&1; then
-            logging::log_fatal "Missing required command: ${cmd}"
-        fi
-    done
+  for cmd in "${REQUIRED_CMDS[@]}"; do
+    if ! command -v "${cmd}" >/dev/null 2>&1; then
+      logging::log_fatal "Missing required command: ${cmd}"
+    fi
+  done
 }
 
 # Extracts a required field from JSON or logs and exits
@@ -46,7 +46,7 @@ parse_field_or_die() {
   local json="${2}"
   local value
 
-  if ! value="$(jq -er ".${key}" <<< "${json}" 2>/dev/null)"; then
+  if ! value="$(jq -er ".${key}" <<<"${json}" 2>/dev/null)"; then
     logging::log_error "'${key}' missing in config"
     return 3
   fi
@@ -60,7 +60,10 @@ parse_config() {
   local -ar required_keys=(name repo vcs tag)
   local -a values=()
 
-  config_json="$(<&3)" || { logging::log_error "Failed to read stdin"; return 3; }
+  config_json="$(<&3)" || {
+    logging::log_error "Failed to read stdin"
+    return 3
+  }
 
   for key in "${required_keys[@]}"; do
     values+=("$(parse_field_or_die "${key}" "${config_json}")")
@@ -84,9 +87,9 @@ download_modules() {
   local basedir="${PWD}"
 
   logging::log_info "Downloading Go modules for ${name}"
-  pushd "${name}" > /dev/null
+  pushd "${name}" >/dev/null
   env GOMODCACHE="${basedir}/go-mod" go mod download -modcacherw -x
-  popd > /dev/null
+  popd >/dev/null
 }
 
 # Ensure the tag matches the v0.0.0 format as this fails otherwise
@@ -124,16 +127,16 @@ create_tarball() {
   logging::log_info "Creating tarball ${target}"
 
   if check_dir_not_empty "${deps_dir}"; then
-      tar -cf - "${deps_dir}" | xz --threads=0 -9e -T0 > "${target}"
-      printf '%s' "${target}"
+    tar -cf - "${deps_dir}" | xz --threads=0 -9e -T0 >"${target}"
+    printf '%s' "${target}"
   else
-      logging::log_error "Go mod deps download failed, '${deps_dir}' is empty or missing."
-      return 1
+    logging::log_error "Go mod deps download failed, '${deps_dir}' is empty or missing."
+    return 1
   fi
 }
 
 cleanup() {
-  popd > /dev/null || true
+  popd >/dev/null || true
   rm -rf -- "${TMPDIR}"
 }
 
@@ -153,7 +156,7 @@ main() {
 
   # Parse command line options passed to script
   mapfile -d '' fields < <(parse_config <&3)
-  (( ${#fields[@]} == 4 )) || {
+  ((${#fields[@]} == 4)) || {
     logging::logging_error "Invalid config input: missing fields."
     exit 2
   }
@@ -171,7 +174,7 @@ main() {
   # Create temporary working directory
   TMPDIR="$(mktemp -d)"
 
-  pushd "${TMPDIR}" > /dev/null
+  pushd "${TMPDIR}" >/dev/null
 
   # Checkout release tag
   checkout_tag "${name}" "${repo}" "${vcs}" "${tag}"
@@ -188,7 +191,7 @@ main() {
     exit 1
   fi
 
-  popd > /dev/null
+  popd >/dev/null
 
   # Move the tarball to current working directory
   mv "${TMPDIR}/${tarball_path}" .

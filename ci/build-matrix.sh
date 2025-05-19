@@ -11,12 +11,21 @@ INTO_THE_MATRIX_NEO
 }
 
 parse_args() {
-  (( $# == 2 )) || { echo "ERROR: invalid number of args passed" >&2; usage; }
+  (($# == 2)) || {
+    echo "ERROR: invalid number of args passed" >&2
+    usage
+  }
   declare -g CONFIG_FILE="${1}"
   declare -g RELEASED_FILE="${2}"
 
-  [[ -f ${CONFIG_FILE} ]] || { echo "ERROR: missing ${CONFIG_FILE}"  >&2; usage; }
-  [[ -f ${RELEASED_FILE} ]] || { echo "ERROR: missing ${RELEASED_FILE}" >&2; usage; }
+  [[ -f ${CONFIG_FILE} ]] || {
+    echo "ERROR: missing ${CONFIG_FILE}" >&2
+    usage
+  }
+  [[ -f ${RELEASED_FILE} ]] || {
+    echo "ERROR: missing ${RELEASED_FILE}" >&2
+    usage
+  }
 }
 
 load_released_tags() {
@@ -24,7 +33,7 @@ load_released_tags() {
 
   while IFS=$'\n' read -r tag; do
     [[ -n ${tag} ]] && RELEASED["${tag}"]=1
-  done < "${RELEASED_FILE}"
+  done <"${RELEASED_FILE}"
 }
 
 # fetch all tags from a git repo
@@ -49,9 +58,9 @@ process_module() {
     if [[ -z ${released[${tag}]:-} ]]; then
       MATRIX_ENTRIES+=("$(
         jq -nc --arg name "${name}" \
-               --arg repo "${repo}" \
-               --arg vcs "${vcs}" \
-               --arg tag "${tag}" \
+          --arg repo "${repo}" \
+          --arg vcs "${vcs}" \
+          --arg tag "${tag}" \
           '$ARGS.named'
       )")
     fi
