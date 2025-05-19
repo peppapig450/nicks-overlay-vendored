@@ -4,4 +4,8 @@
   - Use `logging::log_*` naming for logging functions
 - Handle rate limiting for github API calls
 - Only run `apt install` once
-- Add actual `config.json`
+
+## Future
+
+For now this only supports go vendored tarballs, in the future if we want to add support
+for rust vendored tarballs we'd have to tweak the config file is read.
