@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Resolve path to this script (even if it's symlinked)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Path to the logging library
+LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.sh"
+
+# Check and source the logging library
+if [[ -f "${LOGGING_PATH}" ]]; then
+  # shellcheck source=../scripts/lib/logging.sh
+  source "${LOGGING_PATH}"
+else
+  printf "Something went wrong sourcing the logging lib: %s\n" "${LOGGING_PATH}" >&2
+  exit 1
+fi
+
 # Required stuff for this build should be installed but we check anyway
 REQUIRED_CMDS=(jq git tar xz go)
 
@@ -13,53 +28,45 @@ FIXIT_FELIX
   exit 2
 }
 
-log() {
-  local level="${1}"
-  shift
-  local ts
-  ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-  local color_reset="\033[0m]"
-  local color
-
-  case "${level}" in
-    INFO) color="\033[0;32m" ;;  # Green!
-    WARN) color="\033[0;33m" ;;  # Yellow!
-    ERROR) color="\033[0;31m" ;; # Red!
-    *)
-      printf "Invalid log level: %s\n" "${level}"; exit 1 ;;
-  esac
-
-  # Send to stderr like a good log citizen
-  printf "%b[%s] [%s] %s%b\n" "${color}" "${ts}" "${level}" "$*" "${color_reset}" >&2
-}
-
-log_info()  { log INFO "$@"; }
-log_warn()  { log WARN "$@"; }
-log_error() { log ERROR "$@"; }
-log_fatal() { log ERROR "$@"; exit 1; }
-
-trap 'log_fatal "Unexpected fatal error in ${BASH_SOURCE[0]} on line ${LINENO}: ${BASH_COMMAND}"' ERR
+# Use logging lib to setup fatal trap
+trap 'logging::trap_err_handler' ERR
 
 # Verifies that our commands are available on path and our environment is correct
 check_requirements() {
     for cmd in "${REQUIRED_CMDS[@]}"; do
         if ! command -v "${cmd}" >/dev/null 2>&1; then
-            log_fatal "Missing required command: ${cmd}"
+            logging::log_fatal "Missing required command: ${cmd}"
         fi
     done
 }
 
+# Extracts a required field from JSON or logs and exits
+parse_field_or_die() {
+  local key="${1}"
+  local json="${2}"
+  local value
+
+  if ! value="$(jq -er ".${key}" <<< "${json}" 2>/dev/null)"; then
+    logging::log_error "'${key}' missing in config"
+    return 3
+  fi
+
+  printf "%s" "${value}"
+}
+
 # Parse the JSON passed to the script as input
 parse_config() {
-  local config_json name repo vcs tag
-  config_json="$(<&3)" || { log_error "Failed to read stdin"; return 3; }
+  local config_json key value
+  local -ar required_keys=(name repo vcs tag)
+  local -a values=()
 
-  name="$(jq -er .name <<< "${config_json}")" || { log_error "'name' missing in config"; return 3; }
-  repo="$(jq -er .repo <<< "${config_json}")" || { log_error "'repo' missing in config"; return 3; }
-  vcs="$(jq -er .vcs <<< "${config_json}")" || { log_error "'vcs' missing in config"; return 3; }
-  tag="$(jq -er .tag <<< "${config_json}")" || { log_error "'vcs' missing in config"; return 3; }
+  config_json="$(<&3)" || { logging::log_error "Failed to read stdin"; return 3; }
 
-  printf "%s\0%s\0%s\0%s\0" "${name}" "${repo}" "${vcs}" "${tag}"
+  for key in "${required_keys[@]}"; do
+    values+=("$(parse_field_or_die "${key}" "${config_json}")")
+  done
+
+  printf "%s\0" "${values[@]}"
 }
 
 checkout_tag() {
@@ -68,7 +75,7 @@ checkout_tag() {
   local vcs="${3}"
   local tag="${4}"
 
-  log_info "Cloning ${vcs} and checking out tag ${tag}"
+  logging::log_info "Cloning ${vcs} and checking out tag ${tag}"
   git clone --depth 1 --branch "${tag}" -- "${vcs}" "${name}"
 }
 
@@ -76,13 +83,13 @@ download_modules() {
   local name="${1}"
   local basedir="${PWD}"
 
-  log_info "Downloading Go modules for ${name}"
+  logging::log_info "Downloading Go modules for ${name}"
   pushd "${name}" > /dev/null
-  env GOMODCACHE="${basedir}/go-mod" go mod download -modcachedrw -x
+  env GOMODCACHE="${basedir}/go-mod" go mod download -modcacherw -x
   popd > /dev/null
 }
 
-# Ensure the TAG matches the v0.0.0 format as this fails otherwise
+# Ensure the tag matches the v0.0.0 format as this fails otherwise
 # XXX: if different version types were to be added more robust version detection is required
 check_tag() {
   local tag="${1}"
@@ -90,7 +97,7 @@ check_tag() {
   if [[ ${tag} =~ ^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$ ]]; then
     printf '%s' "${tag#v}"
   else
-    log_error "The specified TAG is not supported: ${tag}"
+    logging::log_error "The specified tag is not supported: ${tag}"
     return 1
   fi
 }
@@ -109,18 +116,18 @@ create_tarball() {
   local version target
 
   if ! version="$(check_tag "${tag}")"; then
-    log_error "Aborting: invalid tag '${tag}'."
+    logging::log_error "Aborting: invalid tag '${tag}'."
     return 1
   fi
 
   target="${name}-${version}-deps.tar.xz"
-  log_info "Creating tarball ${target}"
+  logging::log_info "Creating tarball ${target}"
 
   if check_dir_not_empty "${deps_dir}"; then
       tar -cf - "${deps_dir}" | xz --threads=0 -9e -T0 > "${target}"
       printf '%s' "${target}"
   else
-      log_error "Go mod deps download failed, '${deps_dir}' is empty or missing."
+      logging::log_error "Go mod deps download failed, '${deps_dir}' is empty or missing."
       return 1
   fi
 }
@@ -137,7 +144,7 @@ main() {
 
   ## If stdin is empty; exit
   if [[ -t 0 ]]; then
-    log_error "STDIN empty. Exiting.."
+    logging::log_error "STDIN empty. Exiting.."
     usage
   fi
 
@@ -146,6 +153,10 @@ main() {
 
   # Parse command line options passed to script
   mapfile -d '' fields < <(parse_config <&3)
+  (( ${#fields[@]} == 4 )) || {
+    logging::logging_error "Invalid config input: missing fields."
+    exit 2
+  }
 
   name="${fields[0]}"
   repo="${fields[1]}"
@@ -155,7 +166,7 @@ main() {
   # Close file descriptor
   exec 3<&-
 
-  log_info "Building Go dependency tarball for ${name} at tag ${tag}"
+  logging::log_info "Building Go dependency tarball for ${name} at tag ${tag}"
 
   # Create temporary working directory
   TMPDIR="$(mktemp -d)"
@@ -173,7 +184,7 @@ main() {
   if tarball_path="$(create_tarball "${name}")"; then
     :
   else
-    log_error "Failed to create tarball for ${name} @ ${TAG}"
+    logging::log_error "Failed to create tarball for ${name} @ ${tag}"
     exit 1
   fi
 
@@ -182,7 +193,7 @@ main() {
   # Move the tarball to current working directory
   mv "${TMPDIR}/${tarball_path}" .
 
-  log_info "Build completed: ${tarball_path}"
+  logging::log_info "Build completed: ${tarball_path}"
 }
 
 # Only run if we're source free!
