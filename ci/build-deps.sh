@@ -106,7 +106,7 @@ create_tarball() {
   local name="${1}"
   local tag="${2}"
   local deps_dir="${name}/go-mod"
-  local version target 
+  local version target
 
   if ! version="$(check_tag "${tag}")"; then
     log_error "Aborting: invalid tag '${tag}'."
@@ -134,7 +134,7 @@ trap 'cleanup' EXIT TERM INT
 
 main() {
   local name repo vcs tag
-  
+
   ## If stdin is empty; exit
   if [[ -t 0 ]]; then
     log_error "STDIN empty. Exiting.."
@@ -146,12 +146,12 @@ main() {
 
   # Parse command line options passed to script
   mapfile -d '' fields < <(parse_config <&3)
-  
+
   name="${fields[0]}"
   repo="${fields[1]}"
   vcs="${fields[2]}"
   tag="${fields[3]}"
-  
+
   # Close file descriptor
   exec 3<&-
 
@@ -159,7 +159,7 @@ main() {
 
   # Create temporary working directory
   TMPDIR="$(mktemp -d)"
-  
+
   pushd "${TMPDIR}" > /dev/null
 
   # Checkout release tag
@@ -176,11 +176,11 @@ main() {
     log_error "Failed to create tarball for ${name} @ ${TAG}"
     exit 1
   fi
-  
+
   popd > /dev/null
 
   # Move the tarball to current working directory
-  mv "${TMPDIR}/${tarball_path}"
+  mv "${TMPDIR}/${tarball_path}" .
 
   log_info "Build completed: ${tarball_path}"
 }
