@@ -12,15 +12,15 @@ INTO_THE_MATRIX_NEO
 
 parse_args() {
   (( $# == 2 )) || { echo "ERROR: invalid number of args passed" >&2; usage; }
-  typeset -g CONFIG_FILE="${1}"
-  typeset -g RELEASED_FILE="${2}"
+  declare -g CONFIG_FILE="${1}"
+  declare -g RELEASED_FILE="${2}"
 
   [[ -f ${CONFIG_FILE} ]] || { echo "ERROR: missing ${CONFIG_FILE}"  >&2; usage; }
   [[ -f ${RELEASED_FILE} ]] || { echo "ERROR: missing ${RELEASED_FILE}" >&2; usage; }
 }
 
 load_released_tags() {
-  typeset -gA RELEASED
+  declare -gA RELEASED
 
   while IFS=$'\n' read -r tag; do
     [[ -n ${tag} ]] && RELEASED["${tag}"]=1
@@ -37,8 +37,8 @@ get_remote_tags() {
 
 # process one module, append new entries to matrix_entries[]
 process_module() {
-  typeset -ga MATRIX_ENTRIES
-  
+  declare -ga MATRIX_ENTRIES
+
   local name="${1}" repo="${2}" vcs="${3}"
   echo "[INFO] Checking tags for ${name}"
 
@@ -74,14 +74,14 @@ build_matrix() {
 # Entry point
 main() {
   # Parse and validate args
-  parse_args
+  parse_args "$@"
 
   # Load already downloaded release tags
   load_released_tags
 
   # Build matrix json array
   build_matrix
-  printf '%s\n' "${MATRIX_ENTRIES[@]}" | jq -s .  
+  printf '%s\n' "${MATRIX_ENTRIES[@]}" | jq -s .
 }
 
 # Make sure main is only ran if executed and not
