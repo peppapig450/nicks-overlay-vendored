@@ -8,29 +8,29 @@ on:
 jobs:
   find-new-tags:
     runs-on: ubuntu-latest
-  outputs:
-    build_matrix: ${{ steps.set-matrix.outputs.matrix }}
-  steps:
-    - uses: actions/checkout@v4
+    outputs:
+      build_matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Set up tools
-      run: sudo apt-get update && sudo apt-get install -y jq git
+      - name: Set up tools
+        run: sudo apt-get update && sudo apt-get install -y jq git
 
-    - name: Get tags already released
-      id: released-tags
-      run: |
-        # collect all tag names that already have a release in this repo
-        gh api repos/${{ github.repository }}/releases --paginate > releases.json
-        jq -r '.[].tag_name' releases.json > released_tags.txt
+      - name: Get tags already released
+        id: released-tags
+        run: |
+          # collect all tag names that already have a release in this repo
+          gh api repos/${{ github.repository }}/releases --paginate > releases.json
+          jq -r '.[].tag_name' releases.json > released_tags.txt
 
-    - name: Prepare build matrix
-      id: set-matrix
-      shell: bash
-      run: |
-        matrix="$(ci/build-matrix.sh configs/modules.json all_tags.txt)"
-        echo "matrix=${matrix}" >> ${GITHUB_OUTPUT}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare build matrix
+        id: set-matrix
+        shell: bash
+        run: |
+          matrix="$(ci/build-matrix.sh configs/go_modules.json released_tags.txt)"
+          echo "matrix=${matrix}" >> ${GITHUB_OUTPUT}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-and-release:
     needs: find-new-tags
@@ -73,4 +73,3 @@ jobs:
           files: ${{ matrix.name }}-${{ matrix.tag#v }}-deps.tar.xz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            
