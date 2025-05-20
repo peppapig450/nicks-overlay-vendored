@@ -87,12 +87,37 @@ load_released_tags() {
   done <"${released_file}"
 }
 
-# fetch all tags from a git repo
-get_remote_tags() {
-  local vcs_url="${1}"
+# Fetch the latest 3 release tags from a git repo using graphql
+# XXX: Maybe add more configurable queries here.
+get_release_tags() {
+  local repo="${1}"
+  local owner="${repo%%/*}"
+  local name="${repo##*/}"
 
-  git ls-remote --tags -- "${vcs_url}" \
-    | perl -M5.010 -ne 'say $1 if /refs\/tags\/([^\^}\s]+)$/'
+  if [[ -z ${owner} || -z ${name} || ${owner} =~ ${repo} ]]; then
+    logging::log_error "Invalid repo string: '${repo}'"
+    return 1
+  fi
+
+  # Define the GraphQL document
+  gql="$(
+    cat <<-'BASHING_GQL'
+    query($owner: String!, $name: String!) {
+      repository(owner: $owner, name: $name) {
+        releases(first: 3) {
+          nodes { tagName }
+        }
+      }
+  }
+BASHING_GQL
+  )"
+
+  # Fire off the request with raw-field (preserves newlines/quotes cleanly)
+  gh api graphql \
+    -f query="${gql}" \
+    -f owner="${owner}" \
+    -f name="${name}" \
+    | jq -r '.data.repository.releases.nodes[].tagName'
 }
 
 # Fetches tags from the remote Git repo and filters out already released ones.
@@ -111,7 +136,7 @@ process_module() {
   logging::log_info "Checking tags for ${name}"
 
   # read remote tags into an array
-  mapfile -t tags < <(get_remote_tags "${vcs}")
+  mapfile -t tags < <(get_release_tags "${repo}")
   for tag in "${tags[@]}"; do
     [[ -z ${tag} ]] && continue
     if [[ -z ${released[${tag}]:-} ]]; then
