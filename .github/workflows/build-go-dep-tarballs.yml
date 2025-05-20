@@ -41,7 +41,7 @@ jobs:
         id: set-matrix
         shell: bash
         run: |
-          matrix="$(ci/build-matrix.sh configs/go_modules.json released_tags.txt)"
+          matrix="$(ci/build-matrix.sh config/go_modules.json released_tags.txt)"
           echo "matrix=${matrix}" >> ${GITHUB_OUTPUT}
 
 
