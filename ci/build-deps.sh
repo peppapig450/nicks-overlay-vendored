@@ -216,7 +216,7 @@ main() {
 
   # Create tarball of modules
   local tarball_path
-  if tarball_path="$(create_tarball "${name}")"; then
+  if tarball_path="$(create_tarball "${name}" "${tag}")"; then
     :
   else
     logging::log_error "Failed to create tarball for ${name} @ ${tag}"
