@@ -82,14 +82,18 @@ parse_field_or_die() {
 # Reads config JSON from FD 3 and extracts required fields (name, repo, vcs, tag).
 # Outputs them as null-delimited strings (for safe array unpacking).
 parse_config() {
+  local fd="${1}"
   local config_json key value
   local -ar required_keys=(name repo vcs tag)
   local -a values=()
+  local -a json_lines
 
-  config_json="$(<&3)" || {
-    logging::log_error "Failed to read stdin"
+  mapfile -t -u "${fd}" json_lines || {
+    logging::log_error "Failed to read config JSON From FD ${fd}"
     return 3
   }
+
+  printf -v config_json "%s\n" "${json_lines[@]}"
 
   for key in "${required_keys[@]}"; do
     values+=("$(parse_field_or_die "${key}" "${config_json}")")
@@ -175,17 +179,11 @@ trap 'cleanup' EXIT TERM INT
 main() {
   local name repo vcs tag
 
-  ## If stdin is empty; exit
-  if [[ -t 0 ]]; then
-    logging::log_error "STDIN empty. Exiting.."
-    usage
-  fi
-
   # Duplicate stdin to FD 3 for use in subshell
   exec 3<&0
 
   # Parse command line options passed to script
-  mapfile -d '' fields < <(parse_config <&3)
+  mapfile -d '' fields < <(parse_config 3)
   ((${#fields[@]} == 4)) || {
     logging::log_error "Invalid config input: missing fields."
     exit 2
