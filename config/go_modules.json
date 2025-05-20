@@ -1,7 +1,7 @@
 [
   {
     "name": "glow",
-    "repo": "github.com/charmbracelet/glow",
+    "repo": "charmbracelet/glow",
     "vcs": "https://github.com/charmbracelet/glow.git"
   }
 ]
