@@ -2,26 +2,40 @@ name: Build and Release Go Dependency Tarballs
 
 on:
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '0 3 * * *'     # Daily at 03:00 UTC
   workflow_dispatch:
+
+concurrency:
+  group: build-and-release-go-deps
+  cancel-in-progress: true
 
 jobs:
   find-new-tags:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     outputs:
       build_matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up tools
-        run: sudo apt-get update && sudo apt-get install -y jq git
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
 
-      - name: Get tags already released
-        id: released-tags
+      - name: List existing release tags
+        id: list-released-tags
         run: |
           # collect all tag names that already have a release in this repo
-          gh api repos/${{ github.repository }}/releases --paginate > releases.json
-          jq -r '.[].tag_name' releases.json > released_tags.txt
+          gh release list --exclude-drafts --exclude-pre-releases \
+            --limit 1000 --json tagName \
+            | jq -r '.[].tagName' > released_tags.txt
 
       - name: Prepare build matrix
         id: set-matrix
@@ -29,47 +43,49 @@ jobs:
         run: |
           matrix="$(ci/build-matrix.sh configs/go_modules.json released_tags.txt)"
           echo "matrix=${matrix}" >> ${GITHUB_OUTPUT}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
   build-and-release:
     needs: find-new-tags
     runs-on: ubuntu-latest
     # Skip if no new tags
     if: needs.find-new-tags.outputs.build_matrix != '[]'
+
     strategy:
+      fail-fast: false
       matrix:
         include: ${{ fromJson(needs.find-new-tags.outputs.build_matrix) }}
+
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
 
-      - name: Set up Go and jq
-        run: sudo apt-get update && sudo apt-get install -y jq git go
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
 
       - name: Build tarball
+        id: build
         run: |
-          jq -n \
+          tarball="$(jq -n \
             --arg name "${{ matrix.name }}" \
             --arg repo "${{ matrix.repo }}" \
             --arg vcs "${{ matrix.vcs }}" \
             --arg tag "${{ matrix.tag }}" \
             '{name: $name, repo: $repo, vcs: $vcs, tag: $tag}' \
-            | bash ci/build-deps.sh
+            | bash ci/build-deps.sh)"
+          echo "tarball=${tarball}" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release
+      - name: Create or update release and upload asset
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ matrix.tag }}
           name: "${{ matrix.name }} ${{ matrix.tag }}"
           body: |
             Automated build for ${{ matrix.name }} tag ${{ matrix.tag }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload tarball to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ matrix.tag }}
-          files: ${{ matrix.name }}-${{ matrix.tag#v }}-deps.tar.xz
+          files: ${{ steps.build.outputs.tarball }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
