@@ -1,4 +1,29 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# build-deps.sh — Build vendored Go dependency tarball for a given module tag
+#
+# This script is meant to be invoked from CI or automation. It reads a JSON
+# config (from stdin) describing a Go module to build (name, repo, vcs, tag),
+# checks out the repo at the specified tag, downloads its Go dependencies,
+# and packages them into a compressed tarball.
+#
+# Output: the tarball filename (stdout)
+#
+# Behavior:
+#   - Uses custom logging library (logging.sh)
+#   - Exits on errors with detailed log messages
+#   - Requires jq, git, tar, xz, go to be installed
+#   - Ensures Go mod cache is non-empty before packaging
+#
+# Meant to be sourced for testing or invoked directly by CI (e.g., GitHub Actions)
+#
+# Example:
+#   jq -n --arg name foo --arg repo myorg/foo --arg vcs https://github.com/myorg/foo.git --arg tag v1.2.3 \
+#     '{name: $name, repo: $repo, vcs: $vcs, tag: $tag}' \
+#     | ./ci/build-deps.sh
+#
+# See also: ../scripts/lib/logging.sh
+# ==============================================================================
 set -Eeuo pipefail
 
 # Resolve path to this script (even if it's symlinked)
@@ -54,7 +79,8 @@ parse_field_or_die() {
   printf "%s" "${value}"
 }
 
-# Parse the JSON passed to the script as input
+# Reads config JSON from FD 3 and extracts required fields (name, repo, vcs, tag).
+# Outputs them as null-delimited strings (for safe array unpacking).
 parse_config() {
   local config_json key value
   local -ar required_keys=(name repo vcs tag)
@@ -87,9 +113,10 @@ download_modules() {
   local basedir="${PWD}"
 
   logging::log_info "Downloading Go modules for ${name}"
-  pushd "${name}" >/dev/null
-  env GOMODCACHE="${basedir}/go-mod" go mod download -modcacherw -x
-  popd >/dev/null
+  (
+    cd "${name}" || exit 1
+    env GOMODCACHE="${basedir}/go-mod" go mod download -modcacherw -x
+  )
 }
 
 # Ensure the tag matches the v0.0.0 format as this fails otherwise
@@ -105,13 +132,16 @@ check_tag() {
   fi
 }
 
-# Ensure that the go-mod directory exists and is non-empty
+# Returns success if the given directory exists and contains at least one entry.
+# Uses 'compgen -G' to safely test for matching files without invoking external commands.
+# Note: compgen -G expands globs and prints matches without breaking on filenames with spaces.
 check_dir_not_empty() {
   local dir="${1}"
   [[ -d ${dir} ]] && compgen -G "${dir}/"\* | read -r
 }
 
-# Create vendored Go deps tarball
+# Packages the go-mod directory into a compressed tarball.
+# Returns the tarball filename on success.
 create_tarball() {
   local name="${1}"
   local tag="${2}"
@@ -137,7 +167,7 @@ create_tarball() {
 
 cleanup() {
   popd >/dev/null || true
-  rm -rf -- "${TMPDIR}"
+  rm -rf -- "${BUILD_DEPS_TMP}"
 }
 
 trap 'cleanup' EXIT TERM INT
@@ -157,7 +187,7 @@ main() {
   # Parse command line options passed to script
   mapfile -d '' fields < <(parse_config <&3)
   ((${#fields[@]} == 4)) || {
-    logging::logging_error "Invalid config input: missing fields."
+    logging::log_error "Invalid config input: missing fields."
     exit 2
   }
 
@@ -172,9 +202,13 @@ main() {
   logging::log_info "Building Go dependency tarball for ${name} at tag ${tag}"
 
   # Create temporary working directory
-  TMPDIR="$(mktemp -d)"
+  build_deps_tmp="$(mktemp -d build-deps-XXXX)"
+  BUILD_DEPS_TMP="${build_deps_tmp}"
 
-  pushd "${TMPDIR}" >/dev/null
+  pushd "${BUILD_DEPS_TMP}" >/dev/null || {
+    logging::log_error "Failed to enter ${BUILD_DEPS_TMP}"
+    exit 1
+  }
 
   # Checkout release tag
   checkout_tag "${name}" "${repo}" "${vcs}" "${tag}"
@@ -194,7 +228,7 @@ main() {
   popd >/dev/null
 
   # Move the tarball to current working directory
-  mv "${TMPDIR}/${tarball_path}" .
+  mv "${BUILD_DEPS_TMP}/${tarball_path}" .
 
   logging::log_info "Build completed: ${tarball_path}"
 }
