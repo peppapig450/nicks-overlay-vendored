@@ -81,7 +81,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "${{ matrix.name }} ${{ matrix.tag }}" \
             --notes "Vendored release for ${{ matrix.name }} tag ${{ matrix.tag }}" \
-            --target HEAD \
+            --target "${GITHUB_SHA}" \
             "${asset}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
