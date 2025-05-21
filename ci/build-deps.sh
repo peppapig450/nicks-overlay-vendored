@@ -168,6 +168,28 @@ create_tarball() {
   fi
 }
 
+# Move tarball into working dir and emit the final path
+finalize_tarball() {
+  local build_dir="${1}"
+  local tarball_path="${2}"
+  local final_path
+
+  if [[ -z ${tarball_path} ]]; then
+    logging::log_fatal "No tarball path provided to 'finalize_tarball'"
+    return 1
+  fi
+
+  final_path="${PWD}/$(basename "${tarball_path}")"
+
+  if install -m 644 "${build_dir}/${tarball_path}" "${final_path}"; then
+    logging::log_info "Tarball moved to working dir: ${final_path}"
+    printf '%s\n' "${final_path}"
+  else
+    logging::log_error "Failed to move tarball to working dir"
+    return 1
+  fi
+}
+
 cleanup() {
   popd >/dev/null || true
   rm -rf -- "${BUILD_DEPS_TMP}"
@@ -225,9 +247,11 @@ main() {
   popd >/dev/null
 
   # Move the tarball to current working directory
-  mv "${BUILD_DEPS_TMP}/${tarball_path}" .
-
+  tarball_path="$(finalize_tarball "${BUILD_DEPS_TMP}" "${tarball_path}")"
   logging::log_info "Build completed: ${tarball_path}"
+
+  # Output the path to STDOUT so that the workflow can read it
+  printf "%s\n" "${tarball_path}"
 }
 
 # Only run if we're source free!
