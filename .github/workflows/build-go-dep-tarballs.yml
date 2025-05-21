@@ -28,11 +28,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install jq
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-
       - name: List existing release tags
         id: list-released-tags
         run: |
@@ -65,11 +60,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: 'stable'
-
-      - name: Install jq
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
 
       - name: Build tarball
         id: build
