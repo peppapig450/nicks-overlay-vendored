@@ -8,7 +8,7 @@
 - [] Add the ability to change the number of versions built
 - [] Automatically generate the config based on the ebuild repo
 - [] Automatically replace the `SRC_URI` in ebuilds with our release
-
+- [] Fix the releaes note to not have the symbols '0%0A%'
 
 ## Future
 
