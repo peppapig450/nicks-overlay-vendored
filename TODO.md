@@ -1,9 +1,14 @@
 # TODO
 
-- Extract logging logic from `build-deps.sh` and place in `ci/libs/logging.sh`
-  - Use `logging::log_*` naming for logging functions
-- Handle rate limiting for github API calls
-- Only run `apt install` once
+- [x] Extract logging logic from `build-deps.sh` and place in `ci/libs/logging.sh`
+  - [x] Use `logging::log_*` naming for logging functions
+- [x] Handle rate limiting for GitHub API calls
+- [x] Only run `apt install` once
+- [] Properly detect previously released versions and don't build cleanly
+- [] Add the ability to change the number of versions built
+- [] Automatically generate the config based on the ebuild repo
+- [] Automatically replace the `SRC_URI` in ebuilds with our release
+
 
 ## Future
 
