@@ -9,6 +9,10 @@ concurrency:
   group: build-and-release-go-deps
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   find-new-tags:
     runs-on: ubuntu-latest
