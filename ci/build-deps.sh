@@ -114,12 +114,11 @@ checkout_tag() {
 
 download_modules() {
   local name="${1}"
-  local basedir="${PWD}"
 
   logging::log_info "Downloading Go modules for ${name}"
   (
     cd "${name}" || exit 1
-    env GOMODCACHE="${basedir}/go-mod" go mod download -modcacherw -x
+    env GOMODCACHE="$(pwd)/go-mod" go mod download -modcacherw -x
   )
 }
 
