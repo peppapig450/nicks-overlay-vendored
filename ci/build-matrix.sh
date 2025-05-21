@@ -83,6 +83,7 @@ load_released_tags() {
   arr=()
 
   while IFS=$'\n' read -r tag; do
+    logging::log_info "Found tag: ${tag}"
     [[ -n ${tag} ]] && arr["${tag}"]=1
   done <"${released_file}"
 }
@@ -138,8 +139,9 @@ process_module() {
   # read remote tags into an array
   mapfile -t tags < <(get_release_tags "${repo}")
   for tag in "${tags[@]}"; do
-    [[ -z ${tag} ]] && continue
-    if [[ -z ${released[${tag}]:-} ]]; then
+    check_tag="${name}-${tag}" # Add name to tag to match what's in the released array
+    [[ -z ${check_tag} ]] && continue
+    if [[ -z ${released["${check_tag}"]:-} ]]; then
       matrix+=("$(
         jq -nc --arg name "${name}" \
           --arg repo "${repo}" \
