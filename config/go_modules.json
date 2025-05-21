@@ -3,5 +3,10 @@
     "name": "glow",
     "repo": "charmbracelet/glow",
     "vcs": "https://github.com/charmbracelet/glow.git"
+  },
+  {
+    "name": "cli",
+    "repo": "cli/cli",
+    "vcs": "https://github.com/cli/cli.git"
   }
 ]
