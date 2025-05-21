@@ -73,13 +73,15 @@ jobs:
             | bash ci/build-deps.sh)"
           echo "tarball=${tarball}" >> $GITHUB_OUTPUT
 
-      - name: Create or update release and upload asset
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ matrix.tag }}
-          name: "${{ matrix.name }} ${{ matrix.tag }}"
-          body: |
-            Automated build for ${{ matrix.name }} tag ${{ matrix.tag }}
-          files: ${{ steps.build.outputs.tarball }}
+      - name: Create vendored release
+        run: |
+          asset="${{ steps.build.outputs.tarball }}"
+          tag="${{ matrix.name }}-${{ matrix.tag }}"
+          gh release create "${tag}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "${{ matrix.name }} ${{ matrix.tag }}" \
+            --notes "Vendored release for ${{ matrix.name }} tag ${{ matrix.tag }}" \
+            --target HEAD \
+            "${asset}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
