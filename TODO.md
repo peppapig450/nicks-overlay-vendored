@@ -9,6 +9,7 @@
 - [] Automatically generate the config based on the ebuild repo
 - [] Automatically replace the `SRC_URI` in ebuilds with our release
 - [] Fix the releaes note to not have the symbols '0%0A%'
+- [] Figure out how to output tarballs with names matching gentoo packages
 
 ## Future
 
