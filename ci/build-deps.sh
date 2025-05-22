@@ -160,7 +160,7 @@ create_tarball() {
   logging::log_info "Creating tarball ${target}"
 
   if check_dir_not_empty "${deps_dir}"; then
-    tar -cf - "${deps_dir}" | zstd -19 -T0 >"${target}"
+    tar -C "${name}" -cf - "go-mod" | zstd -19 -T0 >"${target}"
     printf '%s' "${target}"
   else
     logging::log_error "Go mod deps download failed, '${deps_dir}' is empty or missing."
