@@ -80,7 +80,7 @@ jobs:
           gh release create "${tag}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "${{ matrix.name }} ${{ matrix.tag }}" \
-            --notes "Vendored release for ${{ matrix.name }} version ${{ matrix.tag }}%0A%0AUpstream repository: ${{ matrix.vcs }}" \
+            --notes "Vendored release for ${{ matrix.name }} version ${{ matrix.tag }}\n\nUpstream repository: ${{ matrix.vcs }}" \
             --target "${GITHUB_SHA}" \
             "${asset}"
         env:
