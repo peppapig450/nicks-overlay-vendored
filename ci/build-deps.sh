@@ -42,7 +42,7 @@ else
 fi
 
 # Required stuff for this build should be installed but we check anyway
-REQUIRED_CMDS=(jq git tar zstd go)
+REQUIRED_CMDS=(jq git tar xz go)
 
 usage() {
   cat <<FIXIT_FELIX
@@ -156,11 +156,11 @@ create_tarball() {
     return 1
   fi
 
-  target="${name}-${version}-deps.tar.zst"
+  target="${name}-${version}-deps.tar.xz"
   logging::log_info "Creating tarball ${target}"
 
   if check_dir_not_empty "${deps_dir}"; then
-    tar -C "${name}" -cf - "go-mod" | zstd -19 -T0 >"${target}"
+    tar -C "${name}" -cf - "go-mod" | xz --threads=0 -9e -T0 >"${target}"
     printf '%s' "${target}"
   else
     logging::log_error "Go mod deps download failed, '${deps_dir}' is empty or missing."
