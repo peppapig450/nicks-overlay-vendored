@@ -160,7 +160,11 @@ create_tarball() {
   logging::log_info "Creating tarball ${target}"
 
   if check_dir_not_empty "${deps_dir}"; then
-    tar -C "${name}" -cf - "go-mod" | xz --threads=0 -9e -T0 >"${target}"
+    tar \
+      --owner=0 --group=0 --numeric-owner \
+      --mtime="1989-01-01" \
+      --sort=name \
+      -C "${name}" -cf - "go-mod" | xz --threads=0 -9e -T0 >"${target}"
     printf '%s' "${target}"
   else
     logging::log_error "Go mod deps download failed, '${deps_dir}' is empty or missing."
