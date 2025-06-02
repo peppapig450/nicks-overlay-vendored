@@ -161,7 +161,6 @@ create_tarball() {
 
   if check_dir_not_empty "${deps_dir}"; then
     tar \
-      --owner=0 --group=0 --numeric-owner \
       --mtime="1989-01-01" \
       --sort=name \
       -C "${name}" -cf - "go-mod" | xz --threads=0 -9e -T0 >"${target}"
