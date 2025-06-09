@@ -140,8 +140,7 @@ process_module() {
   mapfile -t tags < <(get_release_tags "${repo}")
   for tag in "${tags[@]}"; do
     check_tag="${name}-${tag}" # Add name to tag to match what's in the released array
-    [[ -z ${check_tag} ]] && continue
-    if [[ -z ${released["${check_tag}"]:-} ]]; then
+    if [[ ! -v ${released["${check_tag}":-]} ]]; then
       matrix+=("$(
         jq -nc --arg name "${name}" \
           --arg repo "${repo}" \
