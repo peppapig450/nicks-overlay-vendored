@@ -2,7 +2,7 @@ name: Build and Release Go Dependency Tarballs
 
 on:
   schedule:
-    - cron: '0 3 * * *'     # Daily at 03:00 UTC
+    - cron: "0 3 * * *" # Daily at 03:00 UTC
   workflow_dispatch:
 
 concurrency:
@@ -21,12 +21,19 @@ jobs:
     outputs:
       build_matrix: ${{ steps.set-matrix.outputs.matrix }}
 
-
     steps:
       - name: Checkout repo (full history)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Clone ebuild overlay repo
+        run: |
+          gh repo clone peppapig450/nicks_repo ebuilds -- --depth=1
+
+      - name: Generate ebuild index from overlay
+        run: |
+          python scripts/generate_ebuild_index.py -o ebuild_index.json ebuilds
 
       - name: List existing release tags
         id: list-released-tags
@@ -40,9 +47,8 @@ jobs:
         id: set-matrix
         shell: bash
         run: |
-          matrix="$(ci/build-matrix.sh config/go_modules.json released_tags.txt)"
+          matrix="$(ci/build-matrix.sh config/go_modules.json released_tags.txt ebuild_index.json go)"
           echo "matrix=${matrix}" >> ${GITHUB_OUTPUT}
-
 
   build-and-release:
     needs: find-new-tags
@@ -59,7 +65,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
+          go-version: "stable"
 
       - name: Build tarball
         id: build
