@@ -194,7 +194,6 @@ finalize_tarball() {
 }
 
 cleanup() {
-  popd >/dev/null || true
   rm -rf -- "${BUILD_DEPS_TMP}"
 }
 
