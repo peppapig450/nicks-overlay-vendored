@@ -33,7 +33,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.sh"
 
 # Check and source the logging library
-if [[ -f "${LOGGING_PATH}" ]]; then
+if [[ -f ${LOGGING_PATH} ]]; then
   # shellcheck source=../scripts/lib/logging.sh
   source "${LOGGING_PATH}"
 else
@@ -41,8 +41,7 @@ else
   exit 1
 fi
 
-# Required stuff for this build should be installed but we check anyway
-REQUIRED_CMDS=(jq git tar xz go)
+
 
 usage() {
   cat <<FIXIT_FELIX
@@ -58,11 +57,18 @@ trap 'logging::trap_err_handler' ERR
 
 # Verifies that our commands are available on path and our environment is correct
 check_requirements() {
-  for cmd in "${REQUIRED_CMDS[@]}"; do
-    if ! command -v "${cmd}" >/dev/null 2>&1; then
+  # Required stuff for this build should be installed but we check anyway
+  local -a required_cmds=(jq git tar xz go)
+
+  for cmd in "${required_cmds[@]}"; do
+    if ! command -v "${cmd}" &>/dev/null; then
       logging::log_fatal "Missing required command: ${cmd}"
     fi
   done
+
+  if ! tar --warning=no-unknown-keyword -cf - /dev/null &>/dev/null; then
+    logging::log_fatal "GNU tar not installed. Please install and try again."
+  fi
 }
 
 # Extracts a required field from JSON or logs and exits
@@ -79,7 +85,7 @@ parse_field_or_die() {
   printf "%s" "${value}"
 }
 
-# Reads config JSON from FD 3 and extracts required fields (name, repo, vcs, tag).
+# Reads config JSON from an FD and extracts required fields (name, repo, vcs, tag).
 # Outputs them as null-delimited strings (for safe array unpacking).
 parse_config() {
   local fd="${1}"
@@ -109,7 +115,12 @@ checkout_tag() {
   local tag="${4}"
 
   logging::log_info "Cloning ${vcs} and checking out tag ${tag}"
-  git clone --depth 1 --branch "${tag}" -- "${vcs}" "${name}"
+  git clone \
+    --depth 1 \
+    --branch "${tag}" \
+    --recurse-submodules \
+    --shallow-submodules \
+    -- "${vcs}" "${name}"
 }
 
 download_modules() {
@@ -117,8 +128,8 @@ download_modules() {
 
   logging::log_info "Downloading Go modules for ${name}"
   (
-    cd "${name}" || exit 1
-    env GOMODCACHE="$(pwd)/go-mod" go mod download -modcacherw -x
+    cd -P -- "${name}" || exit 1
+    env GOMODCACHE="${PWD}/go-mod" go mod download -modcacherw -x
   )
 }
 
@@ -130,8 +141,7 @@ check_tag() {
   if [[ ${tag} =~ ^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$ ]]; then
     printf '%s' "${tag#v}"
   else
-    logging::log_error "The specified tag is not supported: ${tag}"
-    return 1
+    logging::log_fatal "The specified tag is not supported: ${tag}"
   fi
 }
 
@@ -152,8 +162,7 @@ create_tarball() {
   local version target
 
   if ! version="$(check_tag "${tag}")"; then
-    logging::log_error "Aborting: invalid tag '${tag}'."
-    return 1
+    logging::log_fatal "Aborting: invalid tag '${tag}'."
   fi
 
   target="${name}-${version}-deps.tar.xz"
@@ -166,8 +175,7 @@ create_tarball() {
       -C "${name}" -cf - "go-mod" | xz --threads=0 -9e -T0 >"${target}"
     printf '%s' "${target}"
   else
-    logging::log_error "Go mod deps download failed, '${deps_dir}' is empty or missing."
-    return 1
+    logging::log_fatal "Go mod deps download failed, '${deps_dir}' is empty or missing."
   fi
 }
 
@@ -179,7 +187,6 @@ finalize_tarball() {
 
   if [[ -z ${tarball_path} ]]; then
     logging::log_fatal "No tarball path provided to 'finalize_tarball'"
-    return 1
   fi
 
   final_path="${PWD}/$(basename "${tarball_path}")"
@@ -188,8 +195,7 @@ finalize_tarball() {
     logging::log_info "Tarball moved to working dir: ${final_path}"
     printf '%s\n' "${final_path}"
   else
-    logging::log_error "Failed to move tarball to working dir"
-    return 1
+    logging::log_fatal "Failed to move tarball to working dir"
   fi
 }
 
@@ -202,11 +208,13 @@ trap 'cleanup' EXIT TERM INT
 main() {
   local name repo vcs tag
 
-  # Duplicate stdin to FD 3 for use in subshell
-  exec 3<&0
+  # Duplicate stdin to an automatically assigned file descriptor for use in
+  # subshell, this is necessary because process substitution does not respect
+  # the main scripts stdin.
+  exec {fd}<&0
 
   # Parse command line options passed to script
-  mapfile -d '' fields < <(parse_config 3)
+  mapfile -d '' fields < <(parse_config ${fd})
   ((${#fields[@]} == 4)) || {
     logging::log_error "Invalid config input: missing fields."
     exit 2
@@ -218,7 +226,7 @@ main() {
   tag="${fields[3]}"
 
   # Close file descriptor
-  exec 3<&-
+  exec {fd}<&-
 
   logging::log_info "Building Go dependency tarball for ${name} at tag ${tag}"
 
@@ -227,8 +235,7 @@ main() {
   BUILD_DEPS_TMP="${build_deps_tmp}"
 
   pushd "${BUILD_DEPS_TMP}" >/dev/null || {
-    logging::log_error "Failed to enter ${BUILD_DEPS_TMP}"
-    exit 1
+    logging::log_fatal "Failed to enter ${BUILD_DEPS_TMP}"
   }
 
   # Checkout release tag
@@ -242,8 +249,7 @@ main() {
   if tarball_path="$(create_tarball "${name}" "${tag}")"; then
     :
   else
-    logging::log_error "Failed to create tarball for ${name} @ ${tag}"
-    exit 1
+    logging::log_fatal "Failed to create tarball for ${name} @ ${tag}"
   fi
 
   popd >/dev/null
