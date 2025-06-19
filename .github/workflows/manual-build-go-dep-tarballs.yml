@@ -1,0 +1,96 @@
+name: Manual Build Go Dependency Tarball
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: "Package name (from config/go_modules.json)"
+        required: true
+        type: string
+      tag_version:
+        description: "Git tag version (e.g., v1.2.3)"
+        required: true
+        type: string
+      force_build:
+        description: "Build even if release already exists"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: manual-build-${{ inputs.package_name }}-${{ inputs.tag_version }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  manual-build:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+
+      - name: Validate package exists in config
+        id: validate
+        run: |
+          package_name="${{ inputs.package_name }}"
+          tag_version="${{ inputs.tag_version }}"
+
+          # Check if package exists in config
+          if ! config_entry=$(jq -e --arg name "$package_name" '.[] | select(.name == $name)' config/go_modules.json); then
+            echo "::error::Package '$package_name' not found in config/go_modules.json"
+            exit 1
+          fi
+
+          # Extract repo and vcs info
+          jq -r '"repo=" + .repo, "vcs=" + .vcs' <<< "$config_entry" >> "$GITHUB_OUTPUT"
+
+          # Check if release already exists (unless force_build is true)
+          release_tag="${package_name}-${tag_version}"
+          if [[ "${{ inputs.force_build }}" != "true" ]]; then
+            if gh release view "$release_tag" >/dev/null 2>&1; then
+              echo "::error::Release '$release_tag' already exists. Use force_build=true to override."
+              exit 1
+            fi
+          fi
+
+      - name: Build tarball
+        id: build
+        run: |
+          tarball="$(jq -n \
+            --arg name "${{ inputs.package_name }}" \
+            --arg repo "${{ steps.validate.outputs.repo }}" \
+            --arg vcs "${{ steps.validate.outputs.vcs }}" \
+            --arg tag "${{ inputs.tag_version }}" \
+            '{name: $name, repo: $repo, vcs: $vcs, tag: $tag}' \
+            | bash ci/build-deps.sh)"
+          echo "tarball=${tarball}" >> $GITHUB_OUTPUT
+
+      - name: Create or update release
+        run: |
+          # Delete existing release if force_build is true
+          tag="${{ inputs.package_name }}-${{ inputs.tag_version }}"
+          if [[ "${{ inputs.force_build }}" == "true" ]]; then
+            if gh release view "$tag" &> /dev/null; then
+              echo "Force build enabled, deleting existing release..."
+              gh release delete "$tag" --yes
+            fi
+          fi
+
+          # Create release using our release script (manual builds are always "vendored" type)
+          bash ci/create-release.sh \
+            "${{ steps.build.outputs.tarball }}" \
+            "${{ inputs.package_name }}" \
+            "${{ inputs.tag_version }}" \
+            "${{ steps.validate.outputs.vcs }}" \
+            "vendored"
