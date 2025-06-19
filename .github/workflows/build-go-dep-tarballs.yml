@@ -81,17 +81,11 @@ jobs:
 
       - name: Create vendored release
         run: |
-          asset="${{ steps.build.outputs.tarball }}"
-          tag="${{ matrix.name }}-${{ matrix.tag }}"
-
-          printf "Vendored release for %s version %s\n\nUpstream repository: %s\n" \
-            "${{ matrix.name }}" "${{ matrix.tag }}" "${{ matrix.vcs }}" > release_notes.txt
-
-          gh release create "${tag}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "${{ matrix.name }} ${{ matrix.tag }}" \
-            --notes-file release_notes.txt \
-            --target "${GITHUB_SHA}" \
-            "${asset}"
+          bash ci/create-release.sh \
+            "${{ steps.build.outputs.tarball }}" \
+            "${{ matrix.name }}" \
+            "${{ matrix.tag }}" \
+            "${{ matrix.vcs }}" \
+            "${{ matrix.build_type }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
