@@ -8,5 +8,11 @@
     "name": "cli",
     "repo": "cli/cli",
     "vcs": "https://github.com/cli/cli.git"
+  },
+  {
+    "name": "actionlint",
+    "repo": "rhysd/actionlint",
+    "vcs": "https://github.com/rhysd/actionlint",
+    "preemptive_count": 2
   }
 ]
