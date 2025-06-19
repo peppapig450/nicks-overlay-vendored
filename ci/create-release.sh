@@ -84,7 +84,7 @@ check_environment() {
 # manpage.
 write_preemptive_notes() {
   cat <<'FAST_AND_CURIOUS'
-    **Preemptive Build**
+**Preemptive Build**
 
 This tarball was built preemptively and may not yet be available in the ebuild repository.
 This allows for faster ebuild creation when adding new packages or versions.
@@ -96,7 +96,7 @@ FAST_AND_CURIOUS
 
 write_vendored_notes() {
   cat <<'DEAR_PORTAGE'
-    **Vendored Build**
+**Vendored Build**
 
 This tarball corresponds to a version that exists in the ebuild repository and has been
 automatically built to provide vendored dependencies.
