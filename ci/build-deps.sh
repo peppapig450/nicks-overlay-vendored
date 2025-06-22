@@ -36,12 +36,11 @@ LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.sh"
 if [[ -f ${LOGGING_PATH} ]]; then
   # shellcheck source=../scripts/lib/logging.sh
   source "${LOGGING_PATH}"
+  logging::init "${BASH_SOURCE[0]}"
 else
   printf "Something went wrong sourcing the logging lib: %s\n" "${LOGGING_PATH}" >&2
   exit 1
 fi
-
-
 
 usage() {
   cat <<FIXIT_FELIX
@@ -51,9 +50,6 @@ Expects config JSON on stdin.
 FIXIT_FELIX
   exit 2
 }
-
-# Use logging lib to setup fatal trap
-trap 'logging::trap_err_handler' ERR
 
 # Verifies that our commands are available on path and our environment is correct
 check_requirements() {

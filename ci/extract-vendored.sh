@@ -31,6 +31,7 @@ LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.sh"
 if [[ -f ${LOGGING_PATH} ]]; then
   # shellcheck source=../scripts/lib/logging.sh
   source "${LOGGING_PATH}"
+  logging::init "${BASH_SOURCE[0]}"
 else
   printf "Something went wrong sourcing the logging lib: %s\n" "${LOGGING_PATH}" >&2
   exit 1
@@ -65,7 +66,7 @@ main() {
     fi
 
     mapfile -t versions < <(extract_versions "${registry}" "${lang}")
-    (( ${#versions[@]} )) || logging::error "No versions for language: ${lang} were parsed from the registry: ${registry}"
+    (( ${#versions[@]} )) || logging::fatal "No versions for language: ${lang} were parsed from the registry: ${registry}"
 
     printf '%s\n' "${versions[@]}"
 }
