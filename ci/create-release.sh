@@ -21,12 +21,13 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Path to the logging library
-LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.sh"
+LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.lib.sh"
 
 # Check and source the logging library
 if [[ -f ${LOGGING_PATH} ]]; then
-  # shellcheck source=../scripts/lib/logging.sh
+  # shellcheck source=../scripts/lib/logging.lib.sh
   source "${LOGGING_PATH}"
+  logging::init "${BASH_SOURCE[0]}"
 else
   printf "Something went wrong sourcing the logging lib: %s\n" "${LOGGING_PATH}" >&2
   exit 1
@@ -49,9 +50,6 @@ Environment:
 RELEASE_THE_KRAKEN
   exit 1
 }
-
-# Setup logging lib's fatal error tracing
-trap 'logging::log_err_handler' ERR
 
 # Validate required environment variables
 check_environment() {
@@ -161,7 +159,7 @@ create_github_release() {
 
 main() {
   if (($# != 5)); then
-    logging::log_error "Invalid number of arguments"
+    logging::log_error "Invalid number of arguments: $#"
     usage
   fi
 

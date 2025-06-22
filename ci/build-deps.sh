@@ -10,7 +10,7 @@
 # Output: the tarball filename (stdout)
 #
 # Behavior:
-#   - Uses custom logging library (logging.sh)
+#   - Uses custom logging library (logging.lib.sh)
 #   - Exits on errors with detailed log messages
 #   - Requires jq, git, tar, xz, go to be installed
 #   - Ensures Go mod cache is non-empty before packaging
@@ -22,7 +22,7 @@
 #     '{name: $name, repo: $repo, vcs: $vcs, tag: $tag}' \
 #     | ./ci/build-deps.sh
 #
-# See also: ../scripts/lib/logging.sh
+# See also: ../scripts/lib/logging.lib.sh
 # ==============================================================================
 set -Eeuo pipefail
 
@@ -30,18 +30,17 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Path to the logging library
-LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.sh"
+LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.lib.sh"
 
 # Check and source the logging library
 if [[ -f ${LOGGING_PATH} ]]; then
-  # shellcheck source=../scripts/lib/logging.sh
+  # shellcheck source=../scripts/lib/logging.lib.sh
   source "${LOGGING_PATH}"
+  logging::init "${BASH_SOURCE[0]}"
 else
   printf "Something went wrong sourcing the logging lib: %s\n" "${LOGGING_PATH}" >&2
   exit 1
 fi
-
-
 
 usage() {
   cat <<FIXIT_FELIX
@@ -51,9 +50,6 @@ Expects config JSON on stdin.
 FIXIT_FELIX
   exit 2
 }
-
-# Use logging lib to setup fatal trap
-trap 'logging::trap_err_handler' ERR
 
 # Verifies that our commands are available on path and our environment is correct
 check_requirements() {

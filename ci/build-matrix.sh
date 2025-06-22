@@ -40,12 +40,13 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Path to the logging library
-LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.sh"
+LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.lib.sh"
 
 # Check and source the logging library
 if [[ -f ${LOGGING_PATH} ]]; then
-  # shellcheck source=../scripts/lib/logging.sh
+  # shellcheck source=../scripts/lib/logging.lib.sh
   source "${LOGGING_PATH}"
+  logging::init "${BASH_SOURCE[0]}"
 else
   printf "Something went wrong sourcing the logging lib: %s\n" "${LOGGING_PATH}" >&2
   exit 1
@@ -69,9 +70,6 @@ Usage: $(basename "${0}") <configs.json> <released_tags.txt> <ebuild_registry.js
 INTO_THE_MATRIX_NEO
   exit 1
 }
-
-# Use logging lib to setup fatal trap
-trap 'logging::trap_err_handler' ERR
 
 # Parses the config and validates input arguments.
 # Exits if file paths are missing or invalid.
