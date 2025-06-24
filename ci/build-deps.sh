@@ -142,7 +142,7 @@ check_tag() {
   local tag="${1}"
 
   if [[ ${tag} =~ ^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$ ]]; then
-    printf '%s' "${tag#v}"
+    printf "%s" "${tag#v}"
   else
     logging::log_fatal "The specified tag is not supported: ${tag}"
   fi
@@ -165,7 +165,7 @@ create_tarball() {
   local version target
 
   if ! version="$(check_tag "${tag}")"; then
-    logging::log_fatal "Aborting: invalid tag '${tag}'."
+    logging::log_fatal "Aborting: invalid tag '${tag}'"
   fi
 
   target="${name}-${version}-deps.tar.xz"
