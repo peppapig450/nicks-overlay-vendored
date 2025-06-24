@@ -1,7 +1,7 @@
 #!/usr/bin/env python3.12
 """
 Generate a registry.json of all ebuilds under an overlay,
-annotated with category, name, version, inherited eclasses and inferred language,
+annotated with category, name, version, repo slug, inherited eclasses and inferred language,
 then group the results by package name with sorted versions.
 """
 
@@ -16,6 +16,11 @@ from packaging.version import parse as parse_version  # pip install packaging
 # Regex to match “name-version.ebuild” and capture name & version
 EBUILD_RE = re.compile(r"^(?P<name>.+)-(?P<version>[0-9][^/]*)\.ebuild$")
 
+# Regex to extract the upstream Git repository
+GITHUB_REPO_RE = re.compile(
+    r"https?://github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)(?:\.git)?/?"
+)
+
 # Map eclasses → language
 ECLASS_LANGUAGES: dict[str, str] = {
     "go-module": "go",
@@ -27,9 +32,8 @@ ECLASS_LANGUAGES: dict[str, str] = {
 }
 
 
-def get_eclasses(path: Path) -> list[str]:
+def get_eclasses(text: str) -> list[str]:
     """Read an ebuild and pull out every inherited eclass."""
-    text = path.read_text(encoding="utf-8")
     eclasses: set[str] = set()
     for line in text.splitlines():
         line = line.strip()
@@ -40,6 +44,11 @@ def get_eclasses(path: Path) -> list[str]:
                 continue
     return sorted(eclasses)
 
+def extract_repo_slug(text: str) -> str | None:
+    """Extract GitHub owner/repo from HOMEPAGE or SRC_URI."""
+    if (match := GITHUB_REPO_RE.search(text)):
+        return f"{match.group('owner')}/{match.group('repo')}"
+    return None
 
 def extract_metadata(path: Path, root: Path) -> dict | None:
     """
@@ -57,7 +66,10 @@ def extract_metadata(path: Path, root: Path) -> dict | None:
         return None
 
     name, version = m.group("name", "version")
-    ecls = get_eclasses(path)
+    
+    text = path.read_text(encoding="utf-8")
+    ecls = get_eclasses(text)
+    repo = extract_repo_slug(text)
     language = next((ECLASS_LANGUAGES[e] for e in ecls if e in ECLASS_LANGUAGES), None)
 
     return {
@@ -66,6 +78,7 @@ def extract_metadata(path: Path, root: Path) -> dict | None:
         "version": version,
         "eclasses": ecls,
         "language": language,
+        "repo": repo,
     }
 
 
@@ -90,7 +103,9 @@ def group_by_name(entries: list[dict]) -> list[dict]:
                 "category": e["category"],
                 "eclasses": e["eclasses"],
                 "language": e["language"],
+                "repo": e["repo"],
                 "versions": [],
+                
             }
         pkgs[nm]["versions"].append(e["version"])
 
