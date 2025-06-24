@@ -34,7 +34,8 @@ jobs:
 
       - name: Generate ebuild index from overlay
         run: |
-          python scripts/generate_ebuild_index.py -o ebuild_index.json ebuilds
+          pip3 install packaging
+          python3 scripts/generate_ebuild_index.py -o ebuild_index.json ebuilds
 
       - name: List existing release tags
         id: list-released-tags
