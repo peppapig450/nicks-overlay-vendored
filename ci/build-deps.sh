@@ -22,7 +22,7 @@
 #     '{name: $name, repo: $repo, vcs: $vcs, tag: $tag}' \
 #     | ./ci/build-deps.sh
 #
-# See also: ../scripts/lib/logging.lib.sh
+# See also: ../scripts/lib/logging/logging.lib.sh
 # ==============================================================================
 set -Eeuo pipefail
 
@@ -30,11 +30,11 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Path to the logging library
-LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.lib.sh"
+LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging/logging.lib.sh"
 
 # Check and source the logging library
 if [[ -f ${LOGGING_PATH} ]]; then
-  # shellcheck source=../scripts/lib/logging.lib.sh
+  # shellcheck source=../scripts/lib/logging/logging.lib.sh
   source "${LOGGING_PATH}"
   logging::init "${BASH_SOURCE[0]}"
 else
