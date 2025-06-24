@@ -21,11 +21,11 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Path to the logging library
-LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging.lib.sh"
+LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging/logging.lib.sh"
 
 # Check and source the logging library
 if [[ -f ${LOGGING_PATH} ]]; then
-  # shellcheck source=../scripts/lib/logging.lib.sh
+  # shellcheck source=../scripts/lib/logging/logging.lib.sh
   source "${LOGGING_PATH}"
   logging::init "${BASH_SOURCE[0]}"
 else
@@ -34,7 +34,7 @@ else
 fi
 
 usage() {
-  cat <<RELEASE_THE_KRAKEN
+  cat << RELEASE_THE_KRAKEN
 Usage: $(basename "${0}") <tarball_path> <name> <tag> <vcs> <build_type>
 
     tarball_path    Path to the built tarball
@@ -81,7 +81,7 @@ check_environment() {
 # This is legal Bash, if you don't believe me read the FUNCTIONS section of the
 # manpage.
 write_preemptive_notes() {
-  cat <<'FAST_AND_CURIOUS'
+  cat << 'FAST_AND_CURIOUS'
 **Preemptive Build**
 
 This tarball was built preemptively and may not yet be available in the ebuild repository.
@@ -93,7 +93,7 @@ FAST_AND_CURIOUS
 } >&${fd}
 
 write_vendored_notes() {
-  cat <<'DEAR_PORTAGE'
+  cat << 'DEAR_PORTAGE'
 **Vendored Build**
 
 This tarball corresponds to a version that exists in the ebuild repository and has been
@@ -110,7 +110,7 @@ generate_release_notes() {
   local notes_file="${5}"
 
   # Open notes file for writing with a file descriptor
-  exec {fd}>>"${notes_file}"
+  exec {fd}>> "${notes_file}"
 
   # Base release notes
   printf "Vendored release for %s version %s\n\n" "${name}" "${tag}" >&${fd}
@@ -196,6 +196,6 @@ main() {
   logging::log_info "Release created successfully: ${name}-${tag}"
 }
 
-if ! (return 0 2>/dev/null); then
+if ! (return 0 2> /dev/null); then
   main "$@"
 fi
