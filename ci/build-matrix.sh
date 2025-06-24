@@ -53,7 +53,7 @@ else
 fi
 
 usage() {
-  cat <<INTO_THE_MATRIX_NEO
+  cat << INTO_THE_MATRIX_NEO
 Usage: $(basename "${0}") <configs.json> <released_tags.txt> <ebuild_registry.json> <language>
 
   configs.json            JSON array of { name, repo, vcs } objects
@@ -99,7 +99,7 @@ load_released_tags() {
   while IFS=$'\n' read -r tag; do
     logging::log_info "Found tag: ${tag}"
     [[ -n ${tag} ]] && arr["${tag}"]=1
-  done <"${released_file}"
+  done < "${released_file}"
 }
 
 # Loads the tags that are packaged in the ebuild repository.
@@ -139,7 +139,7 @@ get_release_tags() {
 
   # Define the GraphQL document
   gql="$(
-    cat <<-'BASHING_GQL'
+    cat <<- 'BASHING_GQL'
     query($owner: String!, $name: String!, $count: Int!) {
       repository(owner: $owner, name: $name) {
         releases(first: $count) {
@@ -270,7 +270,7 @@ build_matrix() {
 main() {
   # Parse and validate args
   config_args="$(parse_args "$@")"
-  read -r config_file released_file registry_file language <<<"${config_args}"
+  read -r config_file released_file registry_file language <<< "${config_args}"
 
   declare -A released_tags
   declare -A vendored_tags
@@ -290,6 +290,6 @@ main() {
 
 # Make sure main is only ran if executed and not
 # if it is sourced.
-if ! (return 0 2>/dev/null); then
+if ! (return 0 2> /dev/null); then
   main "$@"
 fi
