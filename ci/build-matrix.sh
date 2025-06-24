@@ -140,7 +140,7 @@ get_release_tags() {
   # Define the GraphQL document
   gql="$(
     cat <<-'BASHING_GQL'
-    query($owner: String!, $name: String!) {
+    query($owner: String!, $name: String!, $count: Int!) {
       repository(owner: $owner, name: $name) {
         releases(first: $count) {
           nodes { tagName }
