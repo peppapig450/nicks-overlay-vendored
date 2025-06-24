@@ -202,12 +202,6 @@ finalize_tarball() {
   fi
 }
 
-cleanup() {
-  rm -rf -- "${BUILD_DEPS_TMP}"
-}
-
-trap 'cleanup' EXIT TERM INT
-
 main() {
   local name repo vcs tag
 
@@ -226,10 +220,16 @@ main() {
 
   # Create temporary working directory
   build_deps_tmp="$(mktemp -d build-deps-XXXXXX)"
-  BUILD_DEPS_TMP="${build_deps_tmp}"
 
-  pushd "${BUILD_DEPS_TMP}" > /dev/null || {
-    logging::log_fatal "Failed to enter ${BUILD_DEPS_TMP}"
+  _cleanup() {
+    local name="${1:-}"
+    [[ -n ${name} ]] && rm -rf -- "${name}"
+  }
+
+  trap "_cleanup ${build_deps_tmp@Q}" EXIT TERM INT
+
+  pushd "${build_deps_tmp}" > /dev/null || {
+    logging::log_fatal "Failed to enter ${build_deps_tmp}"
   }
 
   # Checkout release tag
@@ -249,7 +249,7 @@ main() {
   popd > /dev/null
 
   # Move the tarball to current working directory
-  tarball_path="$(finalize_tarball "${BUILD_DEPS_TMP}" "${tarball_path}")"
+  tarball_path="$(finalize_tarball "${build_deps_tmp}" "${tarball_path}")"
   logging::log_info "Build completed: ${tarball_path}"
 
   # Output the path to STDOUT so that the workflow can read it
