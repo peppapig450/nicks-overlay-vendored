@@ -43,7 +43,7 @@ else
 fi
 
 usage() {
-  cat <<FIXIT_FELIX
+  cat << FIXIT_FELIX
 Usage: $(basename "${BASH_SOURCE[0]}")
 
 Expects config JSON on stdin.
@@ -57,12 +57,12 @@ check_requirements() {
   local -a required_cmds=(jq git tar xz go)
 
   for cmd in "${required_cmds[@]}"; do
-    if ! command -v "${cmd}" &>/dev/null; then
+    if ! command -v "${cmd}" &> /dev/null; then
       logging::log_fatal "Missing required command: ${cmd}"
     fi
   done
 
-  if ! tar --warning=no-unknown-keyword -cf - /dev/null &>/dev/null; then
+  if ! tar --warning=no-unknown-keyword -cf - /dev/null &> /dev/null; then
     logging::log_fatal "GNU tar not installed. Please install and try again."
   fi
 }
@@ -73,7 +73,7 @@ parse_field_or_die() {
   local json="${2}"
   local value
 
-  if ! value="$(jq -er ".${key}" <<<"${json}" 2>/dev/null)"; then
+  if ! value="$(jq -er ".${key}" <<< "${json}" 2> /dev/null)"; then
     logging::log_error "'${key}' missing in config"
     return 3
   fi
@@ -81,27 +81,34 @@ parse_field_or_die() {
   printf "%s" "${value}"
 }
 
-# Reads config JSON from an FD and extracts required fields (name, repo, vcs, tag).
-# Outputs them as null-delimited strings (for safe array unpacking).
+# Reads config JSON from an FD and sets the passed nameref variables directly.
+# Usage: parse_config fd name_var repo_var vcs_var tag_var
 parse_config() {
   local fd="${1}"
-  local config_json key value
-  local -ar required_keys=(name repo vcs tag)
-  local -a values=()
-  local -a json_lines
+  local -A key_to_var=(
+    [name]="${2}"
+    [repo]="${3}"
+    [vcs]="${4}"
+    [tag]="${5}"
+  )
+  # NOTE: in the future if we need to parse more variables from json we can swap
+  # to using a generalized approach: shifting after assigning fd and then using a
+  # loop to dynamically build the mapping.
 
+  local config_json key
+  local -a json_lines
   mapfile -t -u "${fd}" json_lines || {
-    logging::log_error "Failed to read config JSON From FD ${fd}"
+    logging::log_error "Failed to read config JSON from FD: ${fd}"
     return 3
   }
 
   printf -v config_json "%s\n" "${json_lines[@]}"
 
-  for key in "${required_keys[@]}"; do
-    values+=("$(parse_field_or_die "${key}" "${config_json}")")
+  for key in "${!key_to_var[@]}"; do
+    var_name="${key_to_var[${key}]}"
+    local -n ref="${var_name}"
+    ref="$(parse_field_or_die "${key}" "${config_json}")"
   done
-
-  printf "%s\0" "${values[@]}"
 }
 
 checkout_tag() {
@@ -168,7 +175,7 @@ create_tarball() {
     tar \
       --mtime="1989-01-01" \
       --sort=name \
-      -C "${name}" -cf - "go-mod" | xz --threads=0 -9e -T0 >"${target}"
+      -C "${name}" -cf - "go-mod" | xz --threads=0 -9e -T0 > "${target}"
     printf '%s' "${target}"
   else
     logging::log_fatal "Go mod deps download failed, '${deps_dir}' is empty or missing."
@@ -210,16 +217,7 @@ main() {
   exec {fd}<&0
 
   # Parse command line options passed to script
-  mapfile -d '' fields < <(parse_config ${fd})
-  ((${#fields[@]} == 4)) || {
-    logging::log_error "Invalid config input: missing fields."
-    exit 2
-  }
-
-  name="${fields[0]}"
-  repo="${fields[1]}"
-  vcs="${fields[2]}"
-  tag="${fields[3]}"
+  parse_config "${fd}" name repo vcs tag
 
   # Close file descriptor
   exec {fd}<&-
@@ -227,10 +225,10 @@ main() {
   logging::log_info "Building Go dependency tarball for ${name} at tag ${tag}"
 
   # Create temporary working directory
-  build_deps_tmp="$(mktemp -d build-deps-XXXX)"
+  build_deps_tmp="$(mktemp -d build-deps-XXXXXX)"
   BUILD_DEPS_TMP="${build_deps_tmp}"
 
-  pushd "${BUILD_DEPS_TMP}" >/dev/null || {
+  pushd "${BUILD_DEPS_TMP}" > /dev/null || {
     logging::log_fatal "Failed to enter ${BUILD_DEPS_TMP}"
   }
 
@@ -248,7 +246,7 @@ main() {
     logging::log_fatal "Failed to create tarball for ${name} @ ${tag}"
   fi
 
-  popd >/dev/null
+  popd > /dev/null
 
   # Move the tarball to current working directory
   tarball_path="$(finalize_tarball "${BUILD_DEPS_TMP}" "${tarball_path}")"
@@ -259,6 +257,6 @@ main() {
 }
 
 # Only run if we're source free!
-if ! (return 0 2>/dev/null); then
+if ! (return 0 2> /dev/null); then
   main "$@"
 fi
