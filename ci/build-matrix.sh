@@ -52,12 +52,6 @@ else
   exit 1
 fi
 
-# Path to vendored-extraction helper
-EXTRACT_VENDORED="${SCRIPT_DIR}/extract-vendored.sh"
-if [[ ! -x ${EXTRACT_VENDORED} ]]; then
-  logging::log_fatal "Cannot find or execute ${EXTRACT_VENDORED}"
-fi
-
 usage() {
   cat <<INTO_THE_MATRIX_NEO
 Usage: $(basename "${0}") <configs.json> <released_tags.txt> <ebuild_registry.json> <language>
@@ -116,7 +110,17 @@ load_vendored_tags() {
 
   while IFS=$'\n' read -r entry; do
     [[ -n ${entry} ]] && vendored_ref["${entry}"]=1
-  done < <("${EXTRACT_VENDORED}" "${file}" "${lang}")
+  done < <(
+    jq -r --arg lang "$lang" '
+      .[]
+      | select(.language == $lang)
+      | select(.repo != null and .repo != "")
+      | .repo as $r
+      | .versions[]
+      | select(. != "9999")
+      | "\($r)-\(.)"
+    ' "${file}"
+  )
 
   logging::log_info "Loaded ${#vendored_ref[@]} vendored entries for language '${lang}'"
 }
@@ -178,14 +182,15 @@ process_module() {
   mapfile -t tags < <(get_release_tags "${repo}" "${fetch_count}")
 
   for tag in "${tags[@]}"; do
-    check_tag="${name}-${tag}" # Add name to tag to match what's in the released array
+    local check_name_tag="${name}-${tag}" # Add name to tag to match what's in the released array
+    local check_repo_tag="${repo}-${tag}" # Tag used for vendored lookup
 
     # Skip if empty or already released
-    [[ -z ${check_tag} || -n ${released["${check_tag}"]:-} ]] && continue
+    [[ -z ${check_name_tag} || -n ${released["${check_name_tag}"]:-} ]] && continue
 
     # Check if this tag is in the vendored list (1 = yes, 0 = no)
     local -i is_vendored=0
-    [[ -n ${vendored["${check_tag}"]:-} ]] && is_vendored=1
+    [[ -n ${vendored["${check_repo_tag}"]:-} ]] && is_vendored=1
 
     # Decide whether to build this tag (1 = yes, 0 = no)
     local -i should_build=0
@@ -217,10 +222,10 @@ process_module() {
       printf '%s\n' "${raw_entries[@]}" \
         | jq -cs --arg name "$name" \
           --arg repo "$repo" \
-          --arg vcs "$vcs" \
-          ' map(fromjson)
-        | map(. + {name:$name, repo:$repo, vcs:$vcs})
-        | .[] | @json'
+          --arg vcs "$vcs" '
+          map(. + {name:$name, repo:$repo, vcs:$vcs})
+          | .[]
+        '
     )
 
     # now append each JSON-proper string
