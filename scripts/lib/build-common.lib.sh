@@ -22,7 +22,7 @@
 #   1. Must be sourced from a wrapper script that provides:
 #        - `override::vendor_dependencies` to perform vendoring
 #        - `override::create_tarball` to package the vendored deps
-#   2. The wrapper script must source logging.lib.sh *before* this script.
+#   2. The wrapper script must source logging.lib.sh and utils.lib.sh *before* this script.
 #   3. The wrapper script should then call `common::run_build`
 #
 # Example:
@@ -138,17 +138,10 @@ common::checkout_tag() {
     -- "${vcs}" "${name}"
 }
 
-# Ensure the tag matches the v0.0.0 and fail otherwise
-# XXX: if different version types are handled more robust version detection is needed
+# Ensure the tag contains a valid version and fail otherwise
+# XXX: If semver regex needs to be handled, switch to perl.
 common::check_tag() {
-  local tag="$1"
-
-  if [[ ${tag} =~ ^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$ ]]; then
-    printf "%s" "${tag#v}"
-  else
-    logging::log_error "The specified tag is not supported: ${tag}"
-    return 1
-  fi
+  utils::extract_version "$@" || return 1
 }
 
 # Returns true if the given directory exists and contains at least one entry.
