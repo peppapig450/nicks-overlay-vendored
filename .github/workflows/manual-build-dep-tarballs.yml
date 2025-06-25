@@ -44,10 +44,9 @@ jobs:
           submodules: recursive
 
       - name: Setup language environment
-        if: ${{ inputs.language == 'go' }}
-        uses: actions/setup-go@v5
+        uses: ./.github/actions/setup-language
         with:
-          go-version: "stable"
+          language: ${{ inputs.language }}
 
       - name: Validate package exists in config
         id: validate

@@ -69,9 +69,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - uses: actions/setup-go@v5
+      - name: Setup language environment
+        uses: ./.github/actions/setup-language
         with:
-          go-version: "stable"
+          language: ${{ matrix.language }}
 
       - name: Build tarball
         id: build
