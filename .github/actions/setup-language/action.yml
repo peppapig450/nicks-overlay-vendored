@@ -1,0 +1,29 @@
+name: Setup language
+description: Setup environment for a given language
+inputs:
+  language:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Go
+      if: ${{ inputs.language == 'go' }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+        check-latest: true
+
+    - name: Setup Rust
+      if: ${{ inputs.language == 'rust' }}
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Setup Python
+      if: ${{ inputs.language == 'python' }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+        check-latest: true
