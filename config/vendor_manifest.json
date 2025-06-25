@@ -1,0 +1,28 @@
+{
+    "go": [
+        {
+            "name": "glow",
+            "repo": "charmbracelet/glow",
+            "vcs": "https://github.com/charmbracelet/glow.git"
+        },
+        {
+            "name": "cli",
+            "repo": "cli/cli",
+            "vcs": "https://github.com/cli/cli.git"
+        },
+        {
+            "name": "actionlint",
+            "repo": "rhysd/actionlint",
+            "vcs": "https://github.com/rhysd/actionlint",
+            "preemptive_count": 2
+        }
+    ],
+    "rust": [
+        {
+            "name": "lutgen-rs",
+            "repo": "ozwaldorf/lutgen-rs",
+            "vcs": "https://github.com/ozwaldorf/lutgen-rs",
+            "preemptive_count": 1
+        }
+    ]
+}
