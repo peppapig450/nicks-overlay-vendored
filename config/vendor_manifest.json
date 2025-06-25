@@ -23,6 +23,12 @@
             "repo": "ozwaldorf/lutgen-rs",
             "vcs": "https://github.com/ozwaldorf/lutgen-rs",
             "preemptive_count": 1
+        },
+        {
+            "name": "whiskers",
+            "repo": "catppuccin/whiskers",
+            "vcs": "https://github.com/catppuccin/whiskers",
+            "preemptive_count": 1
         }
     ]
 }
