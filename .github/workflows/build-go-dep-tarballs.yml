@@ -65,8 +65,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        fetch_depth: 0
-        submodules: recursive
+        with:
+          fetch-depth: 0
+          submodules: recursive
 
       - uses: actions/setup-go@v5
         with:
