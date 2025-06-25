@@ -190,6 +190,9 @@ override::create_tarball() {
 common::run_build() {
   local name repo vcs tag
 
+  # Ensure the necessary tools are installed
+  common::check_requirements
+
   # Duplicate stdin to an automatically assigned file descriptor for safe parsing
   # of the JSON configuration piped to the script. This is necessary because subshells
   # and process substitution do not respect the main script's stdin.
