@@ -45,21 +45,12 @@
 # ======================================================================
 set -Eeuo pipefail
 
-# Resolve path to this script (even if it's symlinked)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UTILS_LIB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib" && pwd)"
 
-# Path to the logging library
-LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging/logging.lib.sh"
+source "${UTILS_LIB_ROOT}/utils.lib.sh"
 
-# Check and source the logging library
-if [[ -f ${LOGGING_PATH} ]]; then
-  # shellcheck source=../scripts/lib/logging/logging.lib.sh
-  source "${LOGGING_PATH}"
-  logging::init "${BASH_SOURCE[0]}"
-else
-  printf "Something went wrong sourcing the logging lib: %s\n" "${LOGGING_PATH}" >&2
-  exit 1
-fi
+utils::load_or_die logging.lib.sh
+logging::init "$0"
 
 usage() {
   cat << INTO_THE_MATRIX_NEO
@@ -163,6 +154,9 @@ BASHING_GQL
     -q '.data.repository.releases.nodes[].tagName'
 }
 
+# XXX: maybe we could use the name-version from the ebuild registry to determine
+# the output name for the tarball to simplify using it in ebuilds.
+
 # Fetches tags from the remote Git repo and filters out already released ones.
 # Appends unreleased entries (as JSON) into the matrix array.
 process_module() {
@@ -187,8 +181,14 @@ process_module() {
   mapfile -t tags < <(get_release_tags "${repo}" "${fetch_count}")
 
   for tag in "${tags[@]}"; do
-    local check_name_tag="${name}-${tag}" # Add name to tag to match what's in the released array
-    local check_repo_tag="${repo}-${tag}" # Tag used for vendored lookup
+    local version
+    if ! version="$(utils::extract_version "${tag}")"; then
+      logging::log_warn "Skipping tag with invalid version: ${tag}"
+      continue
+    fi
+
+    local check_name_tag="${name}-${tag}"     # Add name to tag to match what's in the released array
+    local check_repo_tag="${repo}-${version}" # Tag used for vendored lookup
 
     # Skip if empty or already released
     [[ -z ${check_name_tag} || -n ${released["${check_name_tag}"]:-} ]] && continue

@@ -35,28 +35,13 @@
 # ==============================================================================
 set -Eeuo pipefail
 
-readonly SCRIPT_DIR="$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-readonly LOGGING_PATH="${SCRIPT_DIR}/../scripts/lib/logging/logging.lib.sh"
-readonly BUILD_COMMON="${SCRIPT_DIR}/../scripts/lib/build-common.lib.sh"
+UTILS_LIB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib" && pwd)"
 
-# TODO: DRY this
-# Check and source the logging library
-if [[ -r ${LOGGING_PATH} ]]; then
-  # shellcheck source=../scripts/lib/logging/logging.lib.sh
-  source "${LOGGING_PATH}"
-  logging::init "${BASH_SOURCE[0]}"
-else
-  printf "Something went wrong sourcing the logging lib: %s\n" "${LOGGING_PATH}" >&2
-  exit 1
-fi
+source "${UTILS_LIB_ROOT}/utils.lib.sh"
 
-if [[ -r ${BUILD_COMMON} ]]; then
-  # shellcheck source=../scripts/lib/build-common.lib.sh
-  source "${BUILD_COMMON}"
-else
-  printf "Something went wrong sourcing the build-common lib: %s\n" "${BUILD_COMMON}" >&2
-  exit 1
-fi
+utils::load_or_die logging.lib.sh
+logging::init "$0"
+utils::load_or_die build-common.lib.sh
 
 override::vendor_dependencies() {
   local name="$1"
