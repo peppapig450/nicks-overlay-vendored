@@ -1,4 +1,4 @@
-name: Build and Release Go Dependency Tarballs
+name: Build and Release Dependency Tarballs
 
 on:
   schedule:
@@ -49,7 +49,7 @@ jobs:
         id: set-matrix
         shell: bash
         run: |
-          matrix="$(ci/build-matrix.sh config/vendored_manifest.json released_tags.txt ebuild_index.json go)"
+          matrix="$(ci/build-matrix.sh config/vendor_manifest.json released_tags.txt ebuild_index.json)"
           echo "matrix=${matrix}" >> ${GITHUB_OUTPUT}
 
   build-and-release:
@@ -82,7 +82,7 @@ jobs:
             --arg vcs "${{ matrix.vcs }}" \
             --arg tag "${{ matrix.tag }}" \
             '{name: $name, repo: $repo, vcs: $vcs, tag: $tag}' \
-            | bash ci/build-deps.sh)"
+            | bash ci/build-"${{ matrix.language }}"-deps.sh)"
           echo "tarball=${tarball}" >> $GITHUB_OUTPUT
 
       - name: Create vendored release

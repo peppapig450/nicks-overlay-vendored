@@ -1,15 +1,20 @@
-name: Manual Build Go Dependency Tarball
+name: Manual Build Dependency Tarball
 
 on:
   workflow_dispatch:
     inputs:
       package_name:
-        description: "Package name (from config/go_modules.json)"
+        description: "Package name (from config/vendor_manifest.json)"
         required: true
         type: string
       tag_version:
         description: "Git tag version (e.g., v1.2.3)"
         required: true
+        type: string
+      language:
+        description: "Language type (e.g., go, rust)"
+        required: true
+        default: "go"
         type: string
       force_build:
         description: "Build even if release already exists"
@@ -38,7 +43,8 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Setup Go
+      - name: Setup language environment
+        if: ${{ inputs.language == 'go' }}
         uses: actions/setup-go@v5
         with:
           go-version: "stable"
@@ -48,17 +54,21 @@ jobs:
         run: |
           package_name="${{ inputs.package_name }}"
           tag_version="${{ inputs.tag_version }}"
+          language="${{ inputs.language }}"
 
-          # Check if package exists in config
-          if ! config_entry=$(jq -e --arg name "$package_name" '.[] | select(.name == $name)' config/go_modules.json); then
-            echo "::error::Package '$package_name' not found in config/go_modules.json"
+          config_file="config/vendor_manifest.json"
+          if [[ ! -f ${config_file} ]]; then
+            echo "::error::Config file not found: ${config_file}"
             exit 1
           fi
 
-          # Extract repo and vcs info
+          if ! config_entry=$(jq -e --arg lang "$language" --arg name "$package_name" '.[$lang][] | select(.name == $name)' "${config_file}"); then
+            echo "::error::Package '$package_name' not found in ${config_file}"
+            exit 1
+          fi
+
           jq -r '"repo=" + .repo, "vcs=" + .vcs' <<< "$config_entry" >> "$GITHUB_OUTPUT"
 
-          # Check if release already exists (unless force_build is true)
           release_tag="${package_name}-${tag_version}"
           if [[ "${{ inputs.force_build }}" != "true" ]]; then
             if gh release view "$release_tag" >/dev/null 2>&1; then
@@ -76,12 +86,11 @@ jobs:
             --arg vcs "${{ steps.validate.outputs.vcs }}" \
             --arg tag "${{ inputs.tag_version }}" \
             '{name: $name, repo: $repo, vcs: $vcs, tag: $tag}' \
-            | bash ci/build-deps.sh)"
+            | bash ci/build-${{ inputs.language }}-deps.sh)"
           echo "tarball=${tarball}" >> $GITHUB_OUTPUT
 
       - name: Create or update release
         run: |
-          # Delete existing release if force_build is true
           tag="${{ inputs.package_name }}-${{ inputs.tag_version }}"
           if [[ "${{ inputs.force_build }}" == "true" ]]; then
             if gh release view "$tag" &> /dev/null; then
@@ -90,7 +99,6 @@ jobs:
             fi
           fi
 
-          # Create release using our release script (manual builds are always "vendored" type)
           bash ci/create-release.sh \
             "${{ steps.build.outputs.tarball }}" \
             "${{ inputs.package_name }}" \
