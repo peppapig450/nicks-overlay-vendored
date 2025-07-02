@@ -29,6 +29,12 @@
             "repo": "catppuccin/whiskers",
             "vcs": "https://github.com/catppuccin/whiskers",
             "preemptive_count": 1
+        },
+        {
+            "name": "raffi",
+            "repo": "chmouel/raffi",
+            "vcs": "https://github.com/chmouel/raffi",
+            "preemptive_count": 1
         }
     ]
 }
