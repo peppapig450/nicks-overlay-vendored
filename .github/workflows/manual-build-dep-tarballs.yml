@@ -66,7 +66,7 @@ jobs:
             exit 1
           fi
 
-          jq -r '"repo=" + .repo, "vcs=" + .vcs' <<< "$config_entry" >> "$GITHUB_OUTPUT"
+          jq -r '"repo=" + .repo, "vcs=" + .vcs, "subdir=" + (.subdir // "")' <<< "$config_entry" >> "$GITHUB_OUTPUT"
 
           release_tag="${package_name}-${tag_version}"
           if [[ "${{ inputs.force_build }}" != "true" ]]; then
@@ -84,7 +84,8 @@ jobs:
             --arg repo "${{ steps.validate.outputs.repo }}" \
             --arg vcs "${{ steps.validate.outputs.vcs }}" \
             --arg tag "${{ inputs.tag_version }}" \
-            '{name: $name, repo: $repo, vcs: $vcs, tag: $tag}' \
+            --arg subdir "${{ steps.validate.outputs.subdir }}" \
+            '{name: $name, repo: $repo, vcs: $vcs, tag: $tag, subdir: $subdir}' \
             | bash ci/build-${{ inputs.language }}-deps.sh)"
           echo "tarball=${tarball}" >> $GITHUB_OUTPUT
 
