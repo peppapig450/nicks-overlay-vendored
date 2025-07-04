@@ -164,10 +164,11 @@ process_module() {
   local name="$2"
   local repo="$3"
   local vcs="$4"
-  local -i preemptive_count="$5"
-  local -n released="$6"
-  local -n matrix="$7"
-  local -n vendored="$8"
+  local subdir="$5"
+  local -i preemptive_count="$6"
+  local -n released="$7"
+  local -n matrix="$8"
+  local -n vendored="$9"
 
   local -i fetch_count preemptive_added=0
   local -a raw_entries=() matrix_chunk=()
@@ -229,8 +230,9 @@ process_module() {
       printf '%s\n' "${raw_entries[@]}" \
         | jq -cs --arg name "$name" \
           --arg repo "$repo" \
-          --arg vcs "$vcs" '
-          map(. + {name:$name, repo:$repo, vcs:$vcs})
+          --arg vcs "$vcs" \
+          --arg subdir "$subdir" '
+          map(. + {name:$name, repo:$repo, vcs:$vcs, subdir:$subdir})
           | .[]
         '
     )
@@ -247,7 +249,7 @@ build_matrix() {
   local matrix_ref="${3}"
   local vendored_ref="${4}"
 
-  while IFS=$'\t' read -r name repo vcs preemptive_count lang; do
+  while IFS=$'\t' read -r name repo vcs subdir preemptive_count lang; do
     [[ -z ${name} || -z ${repo} || -z ${vcs} || -z ${lang} ]] && {
       logging::log_warn "Skipping incomplete line: ${name} | ${repo} | ${vcs} | ${lang}"
       continue
@@ -261,6 +263,7 @@ build_matrix() {
       "${name}" \
       "${repo}" \
       "${vcs}" \
+      "${subdir}" \
       "${preemptive_count}" \
       "${released_ref}" \
       "${matrix_ref}" \
@@ -272,7 +275,7 @@ build_matrix() {
         | select(.value != null and (.value | type) == "array")
         | .key as $lang
         | .value[]
-        | [.name, .repo, .vcs, (.preemptive_count // 0), $lang]
+        | [.name, .repo, .vcs, (.subdir // ""), (.preemptive_count // 0), $lang]
         | @tsv
       ' "${config_file}"
   )

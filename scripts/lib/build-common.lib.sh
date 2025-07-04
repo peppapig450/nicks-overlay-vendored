@@ -89,7 +89,7 @@ parse_field_or_die() {
 }
 
 # Reads config JSON from an FD and sets the passed name-referenced variables directly.
-# Usage: parse_config <fd> <name_var> <repo_var> <vcs_var> <tag_var>
+# Usage: parse_config <fd> <name_var> <repo_var> <vcs_var> <tag_var> [subdir_var]
 common::parse_config() {
   local fd="$1"
   local -A key_to_var=(
@@ -98,6 +98,10 @@ common::parse_config() {
     [vcs]="$4"
     [tag]="$5"
   )
+  local subdir_var="${6:-}"
+  if [[ -n ${subdir_var} ]]; then
+    key_to_var[subdir]="${subdir_var}"
+  fi
   # NOTE: in the future if we need to parse more variables from json we can swap
   # to using a generalized approach: shifting after assigning fd and then using a
   # loop to dynamically build the mapping.
@@ -117,8 +121,12 @@ common::parse_config() {
   for key in "${!key_to_var[@]}"; do
     local var_name="${key_to_var[${key}]}"
     local -n ref="${var_name}"
-    if ! ref="$(parse_field_or_die "${key}" "${config_json}")"; then
-      logging::log_fatal "Missing field: ${key} in config"
+    if [[ ${key} == "subdir" ]]; then
+      ref="$(jq -er ".${key} // \"\"" <<< "${config_json}")"
+    else
+      if ! ref="$(parse_field_or_die "${key}" "${config_json}")"; then
+        logging::log_fatal "Missing field: ${key} in config"
+      fi
     fi
   done
 }
@@ -188,7 +196,7 @@ override::create_tarball() {
 # vendor tarball. Implements language specific vendoring based on the sourcing scripts
 # implementation of the override::* functions.
 common::run_build() {
-  local name repo vcs tag
+  local name repo vcs tag subdir
 
   # Ensure the necessary tools are installed
   common::check_requirements
@@ -200,7 +208,7 @@ common::run_build() {
   exec {fd}<&0
 
   # Parse command line options passed to the script via nameref
-  common::parse_config "${fd}" name repo vcs tag
+  common::parse_config "${fd}" name repo vcs tag subdir
 
   # Close file descriptor
   exec {fd}<&-
@@ -228,10 +236,10 @@ common::run_build() {
   # Checkout release tag to vendor
   common::checkout_tag "${name}" "${repo}" "${vcs}" "${tag}"
 
-  override::vendor_dependencies "${name}"
+  override::vendor_dependencies "${name}" "${subdir}"
 
   local tarball_path
-  if ! tarball_path="$(override::create_tarball "${name}" "${tag}")"; then
+  if ! tarball_path="$(override::create_tarball "${name}" "${tag}" "${subdir}")"; then
     logging::log_fatal "Failed to create tarball for ${name} at ${tag}"
   fi
 

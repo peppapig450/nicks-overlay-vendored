@@ -46,10 +46,14 @@ utils::load_or_die build-common.lib.sh
 
 override::vendor_dependencies() {
   local name="$1"
+  local subdir="$2"
 
   logging::log_info "Vendoring Cargo crates for ${name}"
   (
     cd -P -- "${name}" || logging::log_fatal "Failed to enter directory: ${name}"
+    if [[ -n ${subdir} ]]; then
+      cd -P -- "${subdir}" || logging::log_fatal "Failed to enter subdir: ${subdir}"
+    fi
 
     if ! cargo vendor --locked > /dev/null; then
       logging::log_fatal "Something went wrong running 'cargo vendor'"
@@ -62,6 +66,10 @@ override::vendor_dependencies() {
 override::create_tarball() {
   local name="$1"
   local tag="$2"
+  local subdir="$3"
+
+  local base_dir="${name}"
+  [[ -n ${subdir} ]] && base_dir+="/${subdir}"
 
   local version
   if ! version="$(common::check_tag "${tag}")"; then
@@ -71,13 +79,13 @@ override::create_tarball() {
   local target="${name}-${version}-vendor.tar.xz"
   logging::log_info "Creating tarball: ${target}"
 
-  local deps_dir="${name}/vendor"
+  local deps_dir="${base_dir}/vendor"
 
   if common::check_dir_not_empty "${deps_dir}"; then
     tar \
       --mtime="1989-01-01" \
       --sort=name \
-      -C "${name}" -cf - "vendor" \
+      -C "${base_dir}" -cf - "vendor" \
       | xz --threads=0 -9e -T0 > "${target}"
     printf "%s" "${target}"
   else

@@ -40,7 +40,8 @@
             "name": "BLAKE3",
             "repo": "BLAKE3-team/BLAKE3",
             "vcs": "https://github.com/BLAKE3-team/BLAKE3",
-            "preemptive_count": 1
+            "preemptive_count": 1,
+            "subdir": "b3sum"
         }
     ]
 }

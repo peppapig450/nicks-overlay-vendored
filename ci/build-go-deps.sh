@@ -45,10 +45,14 @@ utils::load_or_die build-common.lib.sh
 
 override::vendor_dependencies() {
   local name="$1"
+  local subdir="$2"
 
   logging::log_info "Downloading Go modules for ${name}"
   (
     cd -P -- "${name}" || logging::log_fatal "Failed to enter directory: ${name}"
+    if [[ -n ${subdir} ]]; then
+      cd -P -- "${subdir}" || logging::log_fatal "Failed to enter subdir: ${subdir}"
+    fi
     env GOMODCACHE="${PWD}/go-mod" go mod download -modcacherw -x
   )
 }
@@ -61,7 +65,10 @@ override::vendor_dependencies() {
 override::create_tarball() {
   local name="$1"
   local tag="$2"
-  local deps_dir="${name}/go-mod"
+  local subdir="$3"
+  local base_dir="${name}"
+  [[ -n ${subdir} ]] && base_dir+="/${subdir}"
+  local deps_dir="${base_dir}/go-mod"
 
   local version
   if ! version="$(common::check_tag "${tag}")"; then
@@ -75,7 +82,7 @@ override::create_tarball() {
     tar \
       --mtime="1989-01-01" \
       --sort=name \
-      -C "${name}" -cf - "go-mod" \
+      -C "${base_dir}" -cf - "go-mod" \
       | xz --threads=0 -9e -T0 > "${target}"
     printf "%s" "${target}"
   else

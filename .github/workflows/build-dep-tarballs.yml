@@ -82,7 +82,8 @@ jobs:
             --arg repo "${{ matrix.repo }}" \
             --arg vcs "${{ matrix.vcs }}" \
             --arg tag "${{ matrix.tag }}" \
-            '{name: $name, repo: $repo, vcs: $vcs, tag: $tag}' \
+            --arg subdir "${{ matrix.subdir }}" \
+            '{name: $name, repo: $repo, vcs: $vcs, tag: $tag, subdir: $subdir}' \
             | bash ci/build-"${{ matrix.language }}"-deps.sh)"
           echo "tarball=${tarball}" >> $GITHUB_OUTPUT
 
