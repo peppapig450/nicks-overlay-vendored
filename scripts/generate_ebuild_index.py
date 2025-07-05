@@ -10,7 +10,12 @@ import json
 import logging
 import re
 from pathlib import Path
-from packaging.version import parse as parse_version  # pip install packaging
+from packaging.version import (
+    Version,
+    InvalidVersion,
+    parse as parse_version,  # pip install packaging
+)
+from functools import reduce
 
 # —————————————————————————————————————————————————————————————————————————
 # Regex to match “name-version.ebuild” and capture name & version
@@ -32,6 +37,36 @@ ECLASS_LANGUAGES: dict[str, str] = {
 }
 
 
+def safe_version_parse(ver: str) -> Version | str:
+    """Parse Gentoo version strings with common suffixes.
+
+    Returns a Version object if parsing succeeds, otherwise returns
+    the original string for lexicographic sorting.
+    """
+    transformations = [(r"_p(\d+)", r".post\1"), (r"_rc", "rc"), (r"_beta", "b")]
+
+    def try_parse(version_str: str):
+        try:
+            return parse_version(version_str)
+        except InvalidVersion:
+            return None
+
+    # Try original first, fallback to normalized
+    if result := try_parse(ver):
+        return result
+
+    # Apply regex transformations one by one
+    def apply_transformations(
+        version: str, pattern_replacement: tuple[str, str]
+    ) -> str:
+        pattern, replacement = pattern_replacement
+        return re.sub(pattern, replacement, version)
+
+    normalized = reduce(apply_transformations, transformations, ver)
+
+    return try_parse(normalized) or ver
+
+
 def get_eclasses(text: str) -> list[str]:
     """Read an ebuild and pull out every inherited eclass."""
     eclasses: set[str] = set()
@@ -44,11 +79,13 @@ def get_eclasses(text: str) -> list[str]:
                 continue
     return sorted(eclasses)
 
+
 def extract_repo_slug(text: str) -> str | None:
     """Extract GitHub owner/repo from HOMEPAGE or SRC_URI."""
-    if (match := GITHUB_REPO_RE.search(text)):
+    if match := GITHUB_REPO_RE.search(text):
         return f"{match.group('owner')}/{match.group('repo')}"
     return None
+
 
 def extract_metadata(path: Path, root: Path) -> dict | None:
     """
@@ -66,7 +103,7 @@ def extract_metadata(path: Path, root: Path) -> dict | None:
         return None
 
     name, version = m.group("name", "version")
-    
+
     text = path.read_text(encoding="utf-8")
     ecls = get_eclasses(text)
     repo = extract_repo_slug(text)
@@ -105,12 +142,11 @@ def group_by_name(entries: list[dict]) -> list[dict]:
                 "language": e["language"],
                 "repo": e["repo"],
                 "versions": [],
-                
             }
         pkgs[nm]["versions"].append(e["version"])
 
     for pkg in pkgs.values():
-        pkg["versions"].sort(key=parse_version)
+        pkg["versions"].sort(key=safe_version_parse)
 
     return sorted(pkgs.values(), key=lambda p: p["name"])
 
