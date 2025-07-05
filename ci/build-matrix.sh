@@ -72,9 +72,9 @@ parse_args() {
     usage
   }
 
-  local config_file="${1}"
-  local released_file="${2}"
-  local registry_file="${3}"
+  local config_file="$1"
+  local released_file="$2"
+  local registry_file="$3"
 
   for file in config_file released_file registry_file; do
     if [[ ! -r ${!file} ]]; then
@@ -89,8 +89,8 @@ parse_args() {
 # Builds an associative array of tags we've already released,
 # so we can skip them during matrix generation.
 load_released_tags() {
-  local array_name="${1}"
-  local released_file="${2}"
+  local array_name="$1"
+  local released_file="$2"
   declare -n arr="${array_name}"
   arr=()
 
@@ -102,8 +102,8 @@ load_released_tags() {
 
 # Loads the tags that are packaged in the ebuild repository.
 load_all_vendored_tags() {
-  local -n vendored_ref="${1}"
-  local file="${2}"
+  local -n vendored_ref="$1"
+  local file="$2"
 
   while IFS=$'\n' read -r entry; do
     [[ -n ${entry} ]] && vendored_ref["${entry}"]=1
@@ -122,7 +122,7 @@ load_all_vendored_tags() {
 
 # Fetch the latest <count> release tags from a git repo using graphql
 get_release_tags() {
-  local repo="${1}"
+  local repo="$1"
   local count="${2:-6}"
   local owner="${repo%%/*}"
   local name="${repo##*/}"
@@ -244,10 +244,10 @@ process_module() {
 
 # iterate over configs.json
 build_matrix() {
-  local config_file="${1}"
-  local released_ref="${2}"
-  local matrix_ref="${3}"
-  local vendored_ref="${4}"
+  local config_file="$1"
+  local released_ref="$2"
+  local matrix_ref="$3"
+  local vendored_ref="$4"
 
   while IFS=$'\t' read -r name repo vcs subdir preemptive_count lang; do
     [[ -z ${name} || -z ${repo} || -z ${vcs} || -z ${lang} ]] && {

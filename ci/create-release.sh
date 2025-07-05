@@ -103,11 +103,11 @@ DEAR_PORTAGE
 
 # Generate release notes based on build type
 generate_release_notes() {
-  local name="${1}"
-  local tag="${2}"
-  local vcs="${3}"
-  local build_type="${4}"
-  local notes_file="${5}"
+  local name="$1"
+  local tag="$2"
+  local vcs="$3"
+  local build_type="$4"
+  local notes_file="$5"
 
   # Open notes file for writing with a file descriptor
   exec {fd}>> "${notes_file}"
@@ -138,11 +138,11 @@ generate_release_notes() {
 }
 
 create_github_release() {
-  local tarball_path="${1}"
-  local name="${2}"
-  local tag="${3}"
-  local build_type="${4}"
-  local notes_file="${5}"
+  local tarball_path="$1"
+  local name="$2"
+  local tag="$3"
+  local build_type="$4"
+  local notes_file="$5"
 
   local release_tag="${name}-${tag}"
   local title="[${build_type}] ${name} ${tag}"
@@ -163,11 +163,11 @@ main() {
     usage
   fi
 
-  local tarball_path="${1}"
-  local name="${2}"
-  local tag="${3}"
-  local vcs="${4}"
-  local build_type="${5}"
+  local tarball_path="$1"
+  local name="$2"
+  local tag="$3"
+  local vcs="$4"
+  local build_type="$5"
 
   # Validate inputs
   if [[ ! -f ${tarball_path} ]]; then
