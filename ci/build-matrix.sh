@@ -54,11 +54,12 @@ logging::init "$0"
 
 usage() {
   cat << INTO_THE_MATRIX_NEO
-Usage: $(basename "${0}") <configs.json> <released_tags.txt> <ebuild_registry.json>
+Usage: $(basename "${0}") <configs.json> <released_tags.txt> <ebuild_registry.json> <schedule>
 
   configs.json            Language-keyed JSON object: { "go": [ {name, repo, vcs, ...} ], ... }
   released_tags.txt       One tag per line (already-released)
   ebuild_registry.json    Registry JSON with versions to vendor
+  schedule                Optional: daily or weekly (Default: daily)
 
 INTO_THE_MATRIX_NEO
   exit 1
@@ -67,7 +68,7 @@ INTO_THE_MATRIX_NEO
 # Parses the config and validates input arguments.
 # Exits if file paths are missing or invalid.
 parse_args() {
-  (($# == 3)) || {
+  (($# == 3 || $# == 4)) || {
     logging::log_error "Invalid number of args parsed"
     usage
   }
@@ -75,6 +76,7 @@ parse_args() {
   local config_file="$1"
   local released_file="$2"
   local registry_file="$3"
+  local schedule="${4:-daily}"
 
   for file in config_file released_file registry_file; do
     if [[ ! -r ${!file} ]]; then
@@ -83,7 +85,12 @@ parse_args() {
     fi
   done
 
-  printf "%s %s %s\n" "${config_file}" "${released_file}" "${registry_file}"
+  if [[ ! ${schedule} =~ ^(daily|weekly)$ ]]; then
+    logging:log_error "Invalid schedule: ${schedule}"
+    usage
+  fi
+
+  printf "%s %s %s %s\n" "${config_file}" "${released_file}" "${registry_file}" "${schedule}"
 }
 
 # Builds an associative array of tags we've already released,
@@ -152,6 +159,13 @@ BASHING_GQL
     -f name="${name}" \
     -F count="${count}" \
     -q '.data.repository.releases.nodes[].tagName'
+}
+
+# Return the latest commit SHA from the default branch of a repo
+get_latest_commit() {
+  local repo="$1"
+
+  gh api "repos/${repo}/commits" -q '.[0].sha'
 }
 
 # XXX: maybe we could use the name-version from the ebuild registry to determine
