@@ -275,7 +275,7 @@ build_matrix() {
         | select(.value != null and (.value | type) == "array")
         | .key as $lang
         | .value[]
-        | [.name, .repo, .vcs, (.subdir // ""), (.preemptive_count // 0), $lang]
+        | [.name, .repo, .vcs, (.subdir // "."), (.preemptive_count // 0), $lang]
         | @tsv
       ' "${config_file}"
   )
