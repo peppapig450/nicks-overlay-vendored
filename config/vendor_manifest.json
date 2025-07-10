@@ -8,7 +8,8 @@
         {
             "name": "cli",
             "repo": "cli/cli",
-            "vcs": "https://github.com/cli/cli.git"
+            "vcs": "https://github.com/cli/cli.git",
+            "preemptive_count": 1
         },
         {
             "name": "actionlint",
