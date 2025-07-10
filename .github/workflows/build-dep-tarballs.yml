@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: build-and-release-go-deps
+  group: build-and-release-deps
   cancel-in-progress: true
 
 permissions:
