@@ -51,6 +51,22 @@ RELEASE_THE_KRAKEN
   exit 1
 }
 
+# Verify our required dependencies are installed.
+check_dependencies() {
+  local -a dependencies=(gh sha256sum sha512sum b2sum)
+  local -a missing_dependencies=()
+
+  for dependency in "${dependencies[@]}"; do
+    if ! command -v -- "$dependency" &> /dev/null; then
+      missing_dependencies+=("$dependency")
+    fi
+  done
+
+  if ((${#missing_dependencies[@]})); then
+    logging::log_fatal "The following dependencies are not installed: ${missing_dependencies[*]}"
+  fi
+}
+
 # Validate required environment variables
 check_environment() {
   local -a required_vars=(GITHUB_TOKEN GITHUB_REPOSITORY)
@@ -59,6 +75,34 @@ check_environment() {
     if [[ -z ${!var:-} ]]; then
       logging::log_fatal "Required environment variable not set: ${var}"
     fi
+  done
+}
+
+# Compute and write checksum files for the tarball.
+compute_checksums() {
+  local tarball="$1"
+  local -n _checksums="$2"
+
+  local tarball_name
+  tarball_name="$(basename -- "$tarball")"
+
+  local -A commands=(
+    ["sha256"]="sha256sum"
+    ["sha512"]="sha512sum"
+    ["blake2"]="b2sum"
+  )
+
+  _checksums=(
+    ["sha256"]="${tarball_name}.sha256sum"
+    ["sha512"]="${tarball_name}.sha512sum"
+    ["blake2"]="${tarball_name}.blake2bsum"
+  )
+
+  for algo in "${!_checksums[@]}"; do
+    cmd="${commands[${algo}]}"
+    output_file="${_checksums[${algo}]}"
+
+    "$cmd" -- "$tarball" > "$output_file"
   done
 }
 
@@ -101,6 +145,25 @@ automatically built to provide vendored dependencies.
 DEAR_PORTAGE
 } >&${fd}
 
+write_checksum_notes() {
+  local -n __checksums="$1"
+  local sha256_sum sha256_path sha512_sum sha512_path
+
+  IFS=' ' read -r sha256_sum sha256_path < "${__checksums["sha256"]}"
+  IFS=' ' read -r sha512_sum sha512_path < "${__checksums["sha512"]}"
+
+  sha256_path="$(basename -- "$sha256_path")"
+  sha512_path="$(basename -- "$sha512_path")"
+
+  cat << CHECKMATE
+
+**Checksums**
+
+SHA256 (${sha256_path}): ${sha256_sum}
+SHA512 (${sha512_path}): ${sha512_sum}
+CHECKMATE
+} >&${fd}
+
 # Generate release notes based on build type
 generate_release_notes() {
   local name="$1"
@@ -108,6 +171,7 @@ generate_release_notes() {
   local vcs="$3"
   local build_type="$4"
   local notes_file="$5"
+  local -n _checksums="$6"
 
   # Open notes file for writing with a file descriptor
   exec {fd}>> "${notes_file}"
@@ -130,6 +194,9 @@ generate_release_notes() {
       ;;
   esac
 
+  # Add checksums
+  write_checksum_notes _checksums
+
   # Use printf with strftime-style formatting (%(... )T) to insert current UTC timestamp
   printf "\n---\nGenerated: %(%Y-%m-%d %H:%M:%S UTC)T\n" >&${fd}
 
@@ -143,9 +210,17 @@ create_github_release() {
   local tag="$3"
   local build_type="$4"
   local notes_file="$5"
+  local -n _checksums="$6"
 
   local release_tag="${name}-${tag}"
   local title="[${build_type}] ${name} ${tag}"
+  local -a checksum_files
+
+  for file in "${_checksums[@]}"; do
+    if [[ -r ${file} ]]; then
+      checksum_files+=("${file}")
+    fi
+  done
 
   logging::log_info "Creating release: ${release_tag}"
 
@@ -154,7 +229,7 @@ create_github_release() {
     --title "${title}" \
     --notes-file "${notes_file}" \
     --target "${GITHUB_SHA:-HEAD}" \
-    "${tarball_path}"
+    "${tarball_path}" "${checksum_files[@]}"
 }
 
 main() {
@@ -181,14 +256,21 @@ main() {
   # Check environment
   check_environment
 
+  # Check dependencies
+  check_dependencies
+
+  # Generate checksums
+  local -A checksums
+  compute_checksums "$tarball_path" checksums
+
   # Generate release notes
   local notes_file
   notes_file="$(mktemp release_notes.txt.XXXXXX)"
 
-  generate_release_notes "${name}" "${tag}" "${vcs}" "${build_type}" "${notes_file}"
+  generate_release_notes "${name}" "${tag}" "${vcs}" "${build_type}" "${notes_file}" checksums
 
   # Create the release
-  create_github_release "${tarball_path}" "${name}" "${tag}" "${build_type}" "${notes_file}"
+  create_github_release "${tarball_path}" "${name}" "${tag}" "${build_type}" "${notes_file}" checksums
 
   # Cleanup
   rm -f -- "${notes_file}"
