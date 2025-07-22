@@ -43,6 +43,12 @@
             "vcs": "https://github.com/BLAKE3-team/BLAKE3",
             "preemptive_count": 1,
             "subdir": "b3sum"
+        },
+        {
+            "name": "eza",
+            "repo": "eza-community/eza",
+            "vcs": "https://github.com/eza-community/eza",
+            "preemptive_count": 2
         }
     ]
 }
