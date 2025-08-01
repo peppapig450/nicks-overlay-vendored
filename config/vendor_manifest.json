@@ -49,6 +49,12 @@
             "repo": "eza-community/eza",
             "vcs": "https://github.com/eza-community/eza",
             "preemptive_count": 2
+        },
+        {
+            "name": "rasusa",
+            "repo": "mbhall88/rasusa",
+            "vcs": "https://github.com/mbhall88/rasusa",
+            "preemptive_count": 1
         }
     ]
 }
