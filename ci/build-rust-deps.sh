@@ -76,7 +76,8 @@ override::create_tarball() {
     logging::log_fatal "Aborting, invalid tag: '${tag}'"
   fi
 
-  local target="${name}-${version}-vendor.tar.xz"
+  local target_name="${name}-${version}"
+  local target="${target_name}-vendor.tar.xz"
   logging::log_info "Creating tarball: ${target}"
 
   local deps_dir="${base_dir}/vendor"
@@ -85,6 +86,7 @@ override::create_tarball() {
     tar \
       --mtime="1989-01-01" \
       --sort=name \
+      --transform="s|^vendor|${target_name}/vendor|"\
       -C "${base_dir}" -cf - "vendor" \
       | xz --threads=0 -9e -T0 > "${target}"
     printf "%s" "${target}"
