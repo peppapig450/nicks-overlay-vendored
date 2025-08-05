@@ -1,0 +1,58 @@
+name: Prune Old Releases
+
+on:
+  schedule:
+    - cron: "0 6 * * 0" # Weekly on Sunday at 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run mode (show what would be deleted without actually deleting)"
+        required: false
+        type: boolean
+        default: true
+      package_filter:
+        description: "Only process specific package (optional)"
+        required: false
+        type: string
+
+concurrency:
+  group: prune-old-releases
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  prune-old-releases:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repo (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Clone ebuild overlay repo
+        run: |
+          gh repo clone peppapig450/nicks_repo ebuilds -- --depth=1
+
+      - name: Generate ebuild index from overlay
+        run: |
+          pip3 install packaging
+          python3 scripts/generate_ebuild_index.py -o ebuild_index.json ebuilds
+
+      - name: Show pruning preview
+        if: ${{ inputs.dry_run == true || github.event_name == 'workflow_dispatch' }}
+        run: |
+          # Create a modified version of the script for dry run
+          sed 's/gh release delete/echo "Would delete:"/g' ci/prune-old-releases.sh > ci/prune-old-releases-dry.sh
+          chmod +x ci/prune-old-releases-dry.sh
+          bash ci/prune-old-releases-dry.sh config/vendor_manifest.json ebuild_index.json
+
+      - name: Prune old releases
+        if: ${{ inputs.dry_run != true && github.event_name == 'schedule' }}
+        run: |
+          bash ci/prune-old-releases.sh config/vendor_manifest.json ebuild_index.json
