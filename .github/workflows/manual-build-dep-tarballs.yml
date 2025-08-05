@@ -104,4 +104,5 @@ jobs:
             "${{ inputs.package_name }}" \
             "${{ inputs.tag_version }}" \
             "${{ steps.validate.outputs.vcs }}" \
-            "vendored"
+            "vendored" \
+            "${{ inputs.language }}"

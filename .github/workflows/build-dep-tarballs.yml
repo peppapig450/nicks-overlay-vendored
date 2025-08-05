@@ -94,6 +94,7 @@ jobs:
             "${{ matrix.name }}" \
             "${{ matrix.tag }}" \
             "${{ matrix.vcs }}" \
-            "${{ matrix.build_type }}"
+            "${{ matrix.build_type }}" \
+            "${{ matrix.language }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

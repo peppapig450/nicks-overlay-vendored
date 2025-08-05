@@ -6,10 +6,10 @@
 # that indicate whether it was a preemptive build or vendored build.
 #
 # Usage:
-#   ./create-release.sh <tarball_path> <name> <tag> <vcs> <build_type>
+#   ./create-release.sh <tarball_path> <name> <tag> <vcs> <build_type> <language>
 #
 # Example:
-#   ./create-release.sh glow-v1.2.3-deps.tar.xz glow v1.2.3 https://github.com/charmbracelet/glow.git preemptive
+#   ./create-release.sh glow-v1.2.3-deps.tar.xz glow v1.2.3 https://github.com/charmbracelet/glow.git preemptive go
 #
 # Requirements:
 #   - gh (GitHub CLI)
@@ -35,13 +35,14 @@ fi
 
 usage() {
   cat << RELEASE_THE_KRAKEN
-Usage: $(basename "${0}") <tarball_path> <name> <tag> <vcs> <build_type>
+Usage: $(basename "${0}") <tarball_path> <name> <tag> <vcs> <build_type> <language>
 
     tarball_path    Path to the built tarball
     name            Package name
     tag             Version tag (e.g., v1.2.3)
     vcs             Upstream VCS URL
     build_type      Either 'vendored' or 'preemptive'
+    language        Language of the vendored package (e.g., go, rust)
 
 Environment:
   GITHUB_TOKEN       GitHub token for API access
@@ -170,8 +171,9 @@ generate_release_notes() {
   local tag="$2"
   local vcs="$3"
   local build_type="$4"
-  local notes_file="$5"
-  local -n _checksums="$6"
+  local language="$5"
+  local notes_file="$6"
+  local -n _checksums="$7"
 
   # Open notes file for writing with a file descriptor
   exec {fd}>> "${notes_file}"
@@ -179,6 +181,7 @@ generate_release_notes() {
   # Base release notes
   printf "Vendored release for %s version %s\n\n" "${name}" "${tag}" >&${fd}
   printf "Upstream repository: %s\n\n" "${vcs}" >&${fd}
+  printf "Language: %s\n\n" "${language}" >&${fd}
 
   # Add-on more notes based on build-type
   case "${build_type}" in
@@ -233,7 +236,7 @@ create_github_release() {
 }
 
 main() {
-  if (($# != 5)); then
+  if (($# != 6)); then
     logging::log_error "Invalid number of arguments: $#"
     usage
   fi
@@ -243,6 +246,7 @@ main() {
   local tag="$3"
   local vcs="$4"
   local build_type="$5"
+  local language="$6"
 
   # Validate inputs
   if [[ ! -f ${tarball_path} ]]; then
@@ -267,7 +271,7 @@ main() {
   local notes_file
   notes_file="$(mktemp release_notes.txt.XXXXXX)"
 
-  generate_release_notes "${name}" "${tag}" "${vcs}" "${build_type}" "${notes_file}" checksums
+  generate_release_notes "${name}" "${tag}" "${vcs}" "${build_type}" "${language}" "${notes_file}" checksums
 
   # Create the release
   create_github_release "${tarball_path}" "${name}" "${tag}" "${build_type}" "${notes_file}" checksums
