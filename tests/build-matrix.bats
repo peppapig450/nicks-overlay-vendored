@@ -7,30 +7,52 @@ setup() {
   TMPDIR="$(mktemp -d)"
   cd "$TMPDIR"
 
-  # Initialize a dummy repo with two tags
-  git init repo
-  cd repo
-  echo hi > a; git add a; git commit -m "init"
-  git tag v1.0; git tag v1.1
+  # Create config, released tags, and ebuild registry files
+  cat > cfg.json <<'EOF'
+{
+  "go": [
+    {
+      "name": "m",
+      "repo": "acme/myrepo",
+      "vcs": "https://example.com/myrepo.git"
+    }
+  ]
+}
+EOF
 
-  # Create config and released-tags files
-  cd ..
-  printf '[{"name":"m","repo":"r","vcs":"%s/repo"}]' "$PWD" > cfg.json
-  printf "v1.0\n" > released.txt
+  echo "m-v1.0.0" > released.txt
+
+  cat > registry.json <<'EOF'
+[
+  {"repo":"acme/myrepo","language":"go","versions":["1.1.0","1.2.0"]}
+]
+EOF
+
+  # Wrapper script to stub get_release_tags without calling GitHub
+  cat > run-matrix.sh <<'EOF'
+#!/usr/bin/env bash
+SCRIPT="$1"; shift
+source "$SCRIPT"
+get_release_tags() {
+  echo v1.2.0
+  echo v1.1.0
+  echo v1.0.0
+}
+main "$@"
+EOF
+  chmod +x run-matrix.sh
 }
 
 teardown() {
   rm -rf "$TMPDIR"
 }
 
-@test "only unreleased tag shows up" {
-  # Run the build-matrix script
-  run bash "$SCRIPT" cfg.json released.txt
+@test "vendored tags appear for multiple versions" {
+  run bash run-matrix.sh "$SCRIPT" cfg.json released.txt registry.json
 
-  # It should exit successfully
   [ "$status" -eq 0 ]
-
-  # Output should include v1.1 but not v1.0
-  echo "$output" | grep -q '"tag":"v1.1"'
-  echo "$output" | grep -vq '"tag":"v1.0"'
+  echo "$output" | grep -q '\"tag\":\"v1.1.0\"'
+  echo "$output" | grep -q '\"tag\":\"v1.2.0\"'
+  echo "$output" | grep -vq '\"tag\":\"v1.0.0\"'
 }
+
