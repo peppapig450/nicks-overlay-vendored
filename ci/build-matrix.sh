@@ -105,6 +105,7 @@ load_all_vendored_tags() {
   local -n vendored_ref="$1"
   local file="$2"
 
+  # Keys are stored as "repo-version:lang" to support multiple vendored versions per repo
   while IFS=$'\n' read -r entry; do
     [[ -n ${entry} ]] && vendored_ref["${entry}"]=1
   done < <(
@@ -188,8 +189,8 @@ process_module() {
       continue
     fi
 
-    local check_name_tag="${name}-${tag}"     # Add name to tag to match what's in the released array
-    local check_repo_tag="${repo}-${version}" # Tag used for vendored lookup
+    local check_name_tag="${name}-${tag}"               # Add name to tag to match what's in the released array
+    local check_repo_tag="${repo}-${version}:${lang}"   # Tag used for vendored lookup (repo-version:lang)
 
     # Skip if empty or already released
     [[ -z ${check_name_tag} || -n ${released["${check_name_tag}"]:-} ]] && continue
