@@ -55,6 +55,12 @@
             "repo": "mbhall88/rasusa",
             "vcs": "https://github.com/mbhall88/rasusa",
             "preemptive_count": 1
+        },
+        {
+            "name": "spotify-player",
+            "repo": "aome510/spotify-player",
+            "vcs": "https://github.com/aome510/spotify-player",
+            "preemptive_count": 1
         }
     ]
 }
