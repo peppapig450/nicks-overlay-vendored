@@ -86,7 +86,7 @@ override::create_tarball() {
     tar \
       --mtime="1989-01-01" \
       --sort=name \
-      --transform="s|^vendor|${target_name}/vendor|"\
+      --transform="s|^vendor|cargo_home/gentoo|" \
       -C "${base_dir}" -cf - "vendor" \
       | xz --threads=0 -9e -T0 > "${target}"
     printf "%s" "${target}"
