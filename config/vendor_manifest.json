@@ -61,6 +61,12 @@
             "repo": "aome510/spotify-player",
             "vcs": "https://github.com/aome510/spotify-player",
             "preemptive_count": 1
+        },
+        {
+            "name": "riff",
+            "repo": "Diegovsky/riff",
+            "vcs": "https://github.com/Diegovsky/riff",
+            "preemptive_count": 1
         }
     ]
 }
