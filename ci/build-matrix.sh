@@ -155,6 +155,21 @@ BASHING_GQL
     -q '.data.repository.releases.nodes[].tagName'
 }
 
+# Determine how many tags to fetch for a module, and populate an array with them
+fetch_module_tags() {
+  local -n _output_tags="$1"
+  local repo="$2"
+  local -i preemptive_count="$3"
+
+  local -i fetch_count=0
+
+  # Calculate how many tags to fetch: default to 6, or preemptive + 2 if asked
+  ((fetch_count = preemptive_count > 0 ? preemptive_count + 2 : 6))
+
+  # Populate the output array
+  mapfile -t _output_tags < <(get_release_tags "$repo" "$fetch_count")
+}
+
 # XXX: maybe we could use the name-version from the ebuild registry to determine
 # the output name for the tarball to simplify using it in ebuilds.
 
@@ -171,16 +186,13 @@ process_module() {
   local -n matrix="$8"
   local -n vendored="$9"
 
-  local -i fetch_count preemptive_added=0
+  local -i preemptive_added=0
   local -a raw_entries=() matrix_chunk=()
 
   logging::log_info "Checking tags for ${name} (preemptive_count: ${preemptive_count})"
 
-  # Calculate how many tags to fetch: default 6, or preemptive+2 if asked
-  ((fetch_count = preemptive_count > 0 ? preemptive_count + 2 : 6))
-
-  # read remote tags into an array
-  mapfile -t tags < <(get_release_tags "${repo}" "${fetch_count}")
+  local -a tags
+  fetch_module_tags tags "$repo" "$preemptive_count"
 
   for tag in "${tags[@]}"; do
     local version
@@ -189,8 +201,8 @@ process_module() {
       continue
     fi
 
-    local check_name_tag="${name}-${tag}"               # Add name to tag to match what's in the released array
-    local check_repo_tag="${repo}-${version}:${lang}"   # Tag used for vendored lookup (repo-version:lang)
+    local check_name_tag="${name}-${tag}"             # Add name to tag to match what's in the released array
+    local check_repo_tag="${repo}-${version}:${lang}" # Tag used for vendored lookup (repo-version:lang)
 
     # Skip if empty or already released
     [[ -z ${check_name_tag} || -n ${released["${check_name_tag}"]:-} ]] && continue
