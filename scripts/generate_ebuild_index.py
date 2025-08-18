@@ -1,21 +1,22 @@
 #!/usr/bin/env python3.12
-"""
-Generate a registry.json of all ebuilds under an overlay,
-annotated with category, name, version, repo slug, inherited eclasses and inferred language,
-then group the results by package name with sorted versions.
+"""Generate a registry.json of all ebuilds under an overlay, annotated with category, name, version,
+repo slug, inherited eclasses and inferred language, then group the results by package name with
+sorted versions.
 """
 
 import argparse
 import json
 import logging
 import re
+from functools import reduce
 from pathlib import Path
+
 from packaging.version import (
-    Version,
     InvalidVersion,
+    Version,
     parse as parse_version,  # pip install packaging
 )
-from functools import reduce
+
 
 # —————————————————————————————————————————————————————————————————————————
 # Regex to match “name-version.ebuild” and capture name & version
@@ -56,9 +57,7 @@ def safe_version_parse(ver: str) -> Version | str:
         return result
 
     # Apply regex transformations one by one
-    def apply_transformations(
-        version: str, pattern_replacement: tuple[str, str]
-    ) -> str:
+    def apply_transformations(version: str, pattern_replacement: tuple[str, str]) -> str:
         pattern, replacement = pattern_replacement
         return re.sub(pattern, replacement, version)
 
@@ -71,8 +70,8 @@ def get_eclasses(text: str) -> list[str]:
     """Read an ebuild and pull out every inherited eclass."""
     eclasses: set[str] = set()
     for line in text.splitlines():
-        line = line.strip()
-        match line.split():
+        current_line = line.strip()
+        match current_line.split():
             case ["inherit", *cls]:
                 eclasses.update(cls)
             case _:
@@ -88,8 +87,7 @@ def extract_repo_slug(text: str) -> str | None:
 
 
 def extract_metadata(path: Path, root: Path) -> dict | None:
-    """
-    Given a full path to an .ebuild, return its metadata dict or None
+    """Given a full path to an .ebuild, return its metadata dict or None
     if it doesn't conform to <root>/<category>/<pkg>/<name>-<ver>.ebuild.
     """
     rel = path.relative_to(root).parts
@@ -122,9 +120,7 @@ def extract_metadata(path: Path, root: Path) -> dict | None:
 def scan(root: Path) -> list[dict]:
     """Walk the tree, extract metadata, and return a sorted list."""
     entries = (
-        meta
-        for p in root.rglob("*.ebuild")
-        if (meta := extract_metadata(p, root)) is not None
+        meta for p in root.rglob("*.ebuild") if (meta := extract_metadata(p, root)) is not None
     )
     return sorted(entries, key=lambda e: (e["category"], e["name"], e["version"]))
 
@@ -153,9 +149,7 @@ def group_by_name(entries: list[dict]) -> list[dict]:
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument(
-        "root", type=Path, nargs="?", default=Path.cwd(), help="Overlay root directory"
-    )
+    p.add_argument("root", type=Path, nargs="?", default=Path.cwd(), help="Overlay root directory")
     p.add_argument(
         "-o",
         "--output",
