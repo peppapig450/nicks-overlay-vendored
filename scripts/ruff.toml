@@ -1,0 +1,38 @@
+# Ruff configuration
+src = ["."]
+target-version = "py313"
+line-length = 100
+exclude = ["__pycache__", ".venv", "build", "dist"]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "S",   # flake8-bandit (security)
+    "B",   # flake8-bugbear (best practices)
+    "A",   # flake8-builtins
+    "C4",  # flake8-comprehensions
+    "T20", # flake8-print
+    "PL",  # pylint
+    "RUF", # Ruff-specific rules
+]
+ignore = []
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.isort]
+force-single-line = false
+combine-as-imports = true
+lines-after-imports = 2
+
+[lint.flake8-bugbear]
+extend-immutable-calls = []
+
+[format]
+quote-style = "double"
+indent-style = "space"
