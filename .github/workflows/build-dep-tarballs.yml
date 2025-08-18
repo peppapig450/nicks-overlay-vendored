@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout repo (full history)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           submodules: recursive
@@ -64,7 +64,7 @@ jobs:
         include: ${{ fromJson(needs.find-new-tags.outputs.build_matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           submodules: recursive
