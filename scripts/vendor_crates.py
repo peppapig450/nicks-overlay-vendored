@@ -56,6 +56,8 @@ from pycargoebuild.fetch import (  # type: ignore[import-untyped]
 
 uvloop.install()
 
+logger = logging.getLogger(__name__)
+
 FETCHERS = ("aiohttp", "aria2", "wget")
 
 
@@ -207,6 +209,8 @@ def fetch_crates_using_aiohttp(crates: Iterable[Crate], *, distdir: Path) -> Non
 
                 destination = distdir / filename
                 if destination.exists() and destination.stat().st_size > 0:
+                    if logger.isEnabledFor(logging.INFO):
+                        logger.warning("Skipping existing crate %s", filename)
                     return  # Already present, verification will run later
 
                 url = crate.download_url
@@ -214,6 +218,7 @@ def fetch_crates_using_aiohttp(crates: Iterable[Crate], *, distdir: Path) -> Non
                 backoff = 0.5
 
                 for attempt in range(1, retries + 1):
+                    logger.info("Starting download of %s (attempt %d)", filename, attempt)
                     try:
                         async with (
                             semaphore,
@@ -241,6 +246,7 @@ def fetch_crates_using_aiohttp(crates: Iterable[Crate], *, distdir: Path) -> Non
                             os.replace(
                                 temp_file, destination
                             )  # Atomically replace on POSIX/windows
+                            logger.info("Finished download of %s (attempt %d)", filename, attempt)
                             return
 
                     except asyncio.CancelledError:
@@ -336,6 +342,8 @@ def repack_crates(crates: set[Crate], *, distdir: Path, tarball: Path, prefix: s
                     start_time = dt.datetime.now(dt.UTC)
                     next_ping = start_time + dt.timedelta(seconds=10)
 
+                    logging.info("Repacking %d crates", total_crates)
+
                     for idx, crate in enumerate(
                         sorted(crates, key=lambda crate: crate.filename), 1
                     ):
@@ -356,6 +364,14 @@ def repack_crates(crates: set[Crate], *, distdir: Path, tarball: Path, prefix: s
             raise
 
     Path(tmp_file.name).rename(tarball)
+
+    end_time = dt.datetime.now(dt.UTC)
+    logging.info(
+        "Repacked %d crates into %s in %s",
+        total_crates,
+        tarball,
+        end_time - start_time,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
