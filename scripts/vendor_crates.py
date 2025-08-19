@@ -35,6 +35,11 @@ else:
             "TOML parsing requires Python >=3.11 (with tomllib) or the 'tomli' package."
         ) from e
 
+import asyncio
+
+import aiohttp
+import uvloop
+from aiolimiter import AsyncLimiter
 from pycargoebuild.cargo import (  # type: ignore[import-untyped]
     Crate,
     FileCrate,
@@ -49,7 +54,9 @@ from pycargoebuild.fetch import (  # type: ignore[import-untyped]
 )
 
 
-FETCHERS = ("aria2", "wget")
+uvloop.install()
+
+FETCHERS = ("aiohttp", "aria2", "wget")
 
 
 class WorkspaceData(NamedTuple):
@@ -90,26 +97,6 @@ def get_workspace_root(directory: Path) -> WorkspaceData:
 
 class Fetcher(Protocol):
     def __call__(self, crates: Iterable[Crate], *, distdir: Path) -> None: ...
-
-
-FETCHER_FUNCS: tuple[Fetcher, ...] = (fetch_crates_using_aria2, fetch_crates_using_wget)
-
-
-def _try_fetcher(func: Fetcher, crates: Iterable[Crate], *, distdir: Path) -> bool:
-    try:
-        func(crates, distdir=distdir)
-    except FileNotFoundError:
-        return False
-    return True
-
-
-def fetch_crates(crates: Iterable[Crate], *, distdir: Path) -> None:
-    """Try aria2, then wget. Raise if neither is available."""
-    for fetcher in FETCHER_FUNCS:
-        if _try_fetcher(fetcher, crates, distdir=distdir):
-            return
-
-    raise RuntimeError(f"No supported fetcher found (tried {', '.join(FETCHERS)})")
 
 
 def _safe_member_name(info: tarfile.TarInfo, crate_dir: PurePosixPath, prefix: str) -> str:
@@ -159,6 +146,165 @@ def _add_crate_to_tar(
     checksum_info.size = len(checksum_data)
     checksum_info.mode = 0o644
     tar_out.addfile(checksum_info, io.BytesIO(checksum_data.encode()))
+
+
+class DownloadError(Exception):
+    def __init__(self, crate: FileCrate, cause: BaseException) -> None:
+        super().__init__(f"failed: {crate.filename} ({crate.download_url}): {cause!r}")
+        self.crate: FileCrate = crate
+        self.__cause__ = cause
+
+
+def fetch_crates_using_aiohttp(crates: Iterable[Crate], *, distdir: Path) -> None:
+    """
+    Portable async fetcher using aiohttp + aiolimiter, optimized for CI.
+    - Uses uvloop when available.
+    - Streams to *.part and renames atomically.
+    - Skips files already present.
+    - Retries 429/5xx with exponential backoff.
+    Environment knobs:
+      VENDOR_CRATES_CONCURRENCY (default: 4*CPU, capped at 32, min 4)
+      VENDOR_CRATES_RPS         (default: concurrency)
+      VENDOR_CRATES_RETRIES     (default: 4)
+    """
+    # Only download file-backed crates; others are handled elsewhere
+    if not (file_crates := [crate for crate in crates if isinstance(crate, FileCrate)]):
+        return
+
+    default_concurrency = min(32, max(4, (os.cpu_count() or 4) * 4))
+    concurrency = int(os.getenv("VENDOR_CRATES_CONCURRENCY", str(default_concurrency)))
+    rate_per_sec = int(os.getenv("VENDOR_CRATES_RPS", str(concurrency)))
+    retries = int(os.getenv("VENDOR_CRATES_RETRIES", "4"))
+
+    async def _run() -> None:
+        timeout = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=300)
+        # We rely on our own semaphore/limiter, so we do not cap connector directly
+        connector = aiohttp.TCPConnector(limit=0, ttl_dns_cache=300)
+
+        headers = {
+            "User-Agent": (
+                f"crates_vendoring/1.0 (+github-actions={os.getenv('GITHUB_ACTIONS', '')}) "
+                f"Python/{sys.version_info[0]}.{sys.version_info[1]}"
+            )
+        }
+
+        semaphore = asyncio.Semaphore(concurrency)
+        limiter = AsyncLimiter(rate_per_sec, time_period=1)
+
+        async with aiohttp.ClientSession(
+            connector=connector,
+            timeout=timeout,
+            headers=headers,
+            trust_env=True,  # respect proxy/CA settings in Actions
+            auto_decompress=False,  # stream raw bytes for .crate/.tar.gz
+        ) as session:
+
+            async def download_crate(crate: FileCrate) -> None:
+                # Ensure we never write outside distdir and keep exact filename
+                filename = crate.filename
+                if Path(filename).is_absolute() or ("/" in filename) or ("\\" in filename):
+                    raise ValueError(f"Unsafe crate filename: {filename!r}")
+
+                destination = distdir / filename
+                if destination.exists() and destination.stat().st_size > 0:
+                    return  # Already present, verification will run later
+
+                url = crate.download_url
+                temp_file = destination.with_suffix(destination.suffix + ".part")
+                backoff = 0.5
+
+                for attempt in range(1, retries + 1):
+                    try:
+                        async with (
+                            semaphore,
+                            limiter,
+                            session.get(url, allow_redirects=True) as response,
+                        ):
+                            # Retry on common transient statuses
+                            if response.status in (429, 500, 502, 503, 504):
+                                raise aiohttp.ClientResponseError(
+                                    response.request_info,
+                                    response.history,
+                                    status=response.status,
+                                    message="retryable",
+                                )
+
+                            response.raise_for_status()
+                            temp_file.parent.mkdir(parents=True, exist_ok=True)
+
+                            # Stream to disk
+                            with temp_file.open("wb") as output_file:
+                                async for chunk in response.content.iter_chunked(1 << 16):
+                                    if chunk:
+                                        output_file.write(chunk)
+
+                            os.replace(
+                                temp_file, destination
+                            )  # Atomically replace on POSIX/windows
+                            return
+
+                    except asyncio.CancelledError:
+                        # Clean partials and retry if we have attempts left
+                        try:
+                            temp_file.unlink(missing_ok=True)
+                        finally:
+                            raise
+
+                    except Exception as e:
+                        try:
+                            temp_file.unlink(missing_ok=True)
+                        except OSError:
+                            pass
+
+                        if attempt == retries:
+                            raise DownloadError(crate, e) from e
+
+                        await asyncio.sleep(backoff)
+                        backoff *= 2
+
+            try:
+                async with asyncio.TaskGroup() as tg:
+                    for crate in file_crates:
+                        tg.create_task(download_crate(crate))
+            except* DownloadError as eg:
+                only_downloads, rest = eg.split(DownloadError)
+
+                if only_downloads is not None:
+                    failed = [
+                        ex.crate.filename
+                        for ex in only_downloads.exceptions
+                        if isinstance(ex, DownloadError)
+                    ]
+                    raise RuntimeError(f"Some downloads failed: {failed}") from only_downloads
+
+                if rest is not None:
+                    raise rest from eg
+
+    asyncio.run(_run())
+
+
+FETCHER_FUNCS: tuple[Fetcher, ...] = (
+    fetch_crates_using_aiohttp,
+    fetch_crates_using_aria2,
+    fetch_crates_using_wget,
+)
+
+
+def _try_fetcher(func: Fetcher, crates: Iterable[Crate], *, distdir: Path) -> bool:
+    try:
+        func(crates, distdir=distdir)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def fetch_crates(crates: Iterable[Crate], *, distdir: Path) -> None:
+    """Try aria2, then wget. Raise if neither is available."""
+    for fetcher in FETCHER_FUNCS:
+        if _try_fetcher(fetcher, crates, distdir=distdir):
+            return
+
+    raise RuntimeError(f"No supported fetcher found (tried {', '.join(FETCHERS)})")
 
 
 def repack_crates(crates: set[Crate], *, distdir: Path, tarball: Path, prefix: str) -> None:
