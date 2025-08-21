@@ -76,18 +76,47 @@ jobs:
             fi
           fi
 
-      - name: Build tarball
+      - name: Build vendor tarball
         id: build
+        shell: bash
         run: |
-          tarball="$(jq -n \
+          mapfile -t lines < <(jq -n \
             --arg name "${{ inputs.package_name }}" \
             --arg repo "${{ steps.validate.outputs.repo }}" \
             --arg vcs "${{ steps.validate.outputs.vcs }}" \
             --arg tag "${{ inputs.tag_version }}" \
             --arg subdir "${{ steps.validate.outputs.subdir }}" \
             '{name: $name, repo: $repo, vcs: $vcs, tag: $tag, subdir: $subdir}' \
-            | bash ci/build-${{ inputs.language }}-deps.sh)"
-          echo "tarball=${tarball}" >> $GITHUB_OUTPUT
+            | bash ci/build-"${{ inputs.language }}"-deps.sh)
+
+          echo "vendored_tarball=${lines[0]}" >> $GITHUB_OUTPUT
+          if [[ "${{ inputs.language }}" == "rust" ]]; then
+            echo "base_dir=${lines[1]}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup uv (Rust only)
+        if: inputs.language == 'rust'
+        uses: astral-sh/setup-uv@v6
+        with:
+          working-directory: scripts/
+
+      - name: Create crates tarball (Rust only)
+        if: inputs.language == 'rust'
+        id: crates
+        run: |
+          VERSION="${{ inputs.tag_version }}"
+          VERSION="${VERSION#v}"
+          CRATES_TARBALL="${{ inputs.package_name }}-${VERSION}-crates.tar.xz"
+
+          uv run --project scripts \
+            --group vendor-crates \
+            --frozen \
+            --no-dev \
+            scripts/vendor_crates.py \
+              -o "$CRATES_TARBALL" \
+              "${{ steps.build.outputs.base_dir }}"
+
+          echo "crates_tarball=$CRATES_TARBALL" >> $GITHUB_OUTPUT
 
       - name: Create or update release
         run: |
@@ -100,9 +129,10 @@ jobs:
           fi
 
           bash ci/create-release.sh \
-            "${{ steps.build.outputs.tarball }}" \
+            "${{ steps.build.outputs.vendored_tarball }}" \
             "${{ inputs.package_name }}" \
             "${{ inputs.tag_version }}" \
             "${{ steps.validate.outputs.vcs }}" \
             "vendored" \
-            "${{ inputs.language }}"
+            "${{ inputs.language }}" \
+            "${{ steps.crates.outputs.crates_tarball || '' }}"

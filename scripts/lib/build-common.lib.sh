@@ -219,15 +219,6 @@ common::run_build() {
   local build_tmp
   build_tmp="$(mktemp -p /tmp -d build-deps-XXXXXX)"
 
-  # Ensure directory is always cleaned up (not really necessary in CI/CD but why not)
-  _cleanup() {
-    local name="${1:-}"
-    [[ -n ${name} ]] && rm -rf -- "${name}"
-  }
-
-  # @Q expands the variable and quotes it; equivalent to printf %q
-  trap '_cleanup '"${build_tmp@Q}" EXIT TERM INT
-
   # Pushd is used here because we use the directory over multiple functions
   pushd "${build_tmp}" > /dev/null || {
     logging::log_fatal "Failed to enter ${build_tmp}"
@@ -245,10 +236,27 @@ common::run_build() {
 
   popd > /dev/null
 
-  # Move the tarball to the current working directory
-  tarball_path="$(common::finalize_tarball "${build_tmp}" "${tarball_path}")"
-  logging::log_info "Vendoring completed: ${tarball_path}"
+  # The language-specific tarball create_tarball may return either:
+  #   - a single line: "<relative-or-absolute-tarball-path>"
+  #   - two lines: "<relative-or-absolute-tarball-path>\n<extra-info>" (e.g., base_dir)
+  # Split into lines to handle either case
+  local -a _tar_lines
+  mapfile -t _tar_lines <<< "${tarball_path}"
+  local tar_path="${_tar_lines[0]}"
+  local extra_line="${_tar_lines[1]:-}"
 
-  # Output the path to STDOUT so that the workflow can read it
-  printf "%s\n" "${tarball_path}"
+  # Finalize (move) the tarball using the first line only
+  local -a finalize_out
+  # Capture finalize output lines (in case finalize prints unexpected data)
+  mapfile -t finalize_out < <(common::finalize_tarball "${build_tmp}" "${tar_path}")
+  local final_tarball_path="${finalize_out[0]}"
+
+  logging::log_info "Vendoring completed: $final_tarball_path"
+
+  # Emit either one or two lines depending on whether `extra_line` was provided
+  if [[ -n ${extra_line} ]]; then
+    printf '%s\n%s\n' "${final_tarball_path}" "${extra_line}"
+  else
+    printf '%s\n' "${final_tarball_path}"
+  fi
 }

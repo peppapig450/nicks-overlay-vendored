@@ -35,14 +35,22 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          working-directory: scripts/
+
       - name: Clone ebuild overlay repo
         run: |
           gh repo clone peppapig450/nicks_repo ebuilds -- --depth=1
 
       - name: Generate ebuild index from overlay
         run: |
-          pip3 install packaging
-          python3 scripts/generate_ebuild_index.py -o ebuild_index.json ebuilds
+          uv run --project scripts \
+            --group generate-ebuild-index \
+            --frozen \
+            --no-dev \
+            scripts/generate_ebuild_index.py -o ebuild_index.json ebuilds
 
       - name: Show pruning preview
         if: ${{ inputs.dry_run == true || github.event_name == 'workflow_dispatch' }}
