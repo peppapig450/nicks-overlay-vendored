@@ -77,8 +77,8 @@ override::create_tarball() {
   fi
 
   local target_name="${name}-${version}"
-  local target="${target_name}-vendor.tar.xz"
-  logging::log_info "Creating tarball: ${target}"
+  local vendor_target="${target_name}-vendor.tar.xz"
+  logging::log_info "Creating tarball: ${vendor_target}"
 
   local deps_dir="${base_dir}/vendor"
 
@@ -88,8 +88,11 @@ override::create_tarball() {
       --sort=name \
       --transform="s|^vendor|cargo_home/gentoo|" \
       -C "${base_dir}" -cf - "vendor" \
-      | xz --threads=0 -9e -T0 > "${target}"
-    printf "%s" "${target}"
+      | xz --threads=0 -9e -T0 > "${vendor_target}"
+
+    # Only return the vendor tarball (line 1) and the base_dir (line 2).
+    # The workflow will build the crates tarball with uv run.
+    printf "%s\n%s" "${vendor_target}" "$(realpath -- "${base_dir}")"
   else
     logging::log_fatal "Cargo vendoring failed, '${deps_dir}' is empty or missing"
   fi

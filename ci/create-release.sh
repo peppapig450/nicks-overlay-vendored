@@ -6,7 +6,7 @@
 # that indicate whether it was a preemptive build or vendored build.
 #
 # Usage:
-#   ./create-release.sh <tarball_path> <name> <tag> <vcs> <build_type> <language>
+#   ./create-release.sh <tarball_path> <name> <tag> <vcs> <build_type> <language> [crates_tarball]
 #
 # Example:
 #   ./create-release.sh glow-v1.2.3-deps.tar.xz glow v1.2.3 https://github.com/charmbracelet/glow.git preemptive go
@@ -35,14 +35,15 @@ fi
 
 usage() {
   cat << RELEASE_THE_KRAKEN
-Usage: $(basename "${0}") <tarball_path> <name> <tag> <vcs> <build_type> <language>
+Usage: $(basename "${0}") <tarball_path> <name> <tag> <vcs> <build_type> <language> [crates_tarball]
 
-    tarball_path    Path to the built tarball
+    tarball_path    Path to the vendored dependency tarball
     name            Package name
     tag             Version tag (e.g., v1.2.3)
     vcs             Upstream VCS URL
     build_type      Either 'vendored' or 'preemptive'
     language        Language of the vendored package (e.g., go, rust)
+    crates_tarball  Optional path to crates tarball (Rust only)
 
 Environment:
   GITHUB_TOKEN       GitHub token for API access
@@ -147,7 +148,8 @@ DEAR_PORTAGE
 } >&${fd}
 
 write_checksum_notes() {
-  local -n __checksums="$1"
+  local label="$1"
+  local -n __checksums="$2"
   local sha256_sum sha256_path sha512_sum sha512_path
 
   IFS=' ' read -r sha256_sum sha256_path < "${__checksums["sha256"]}"
@@ -158,7 +160,7 @@ write_checksum_notes() {
 
   cat << CHECKMATE
 
-**Checksums**
+**Checksums for ${label}**
 
 SHA256 (${sha256_path}): ${sha256_sum}
 SHA512 (${sha512_path}): ${sha512_sum}
@@ -173,7 +175,9 @@ generate_release_notes() {
   local build_type="$4"
   local language="$5"
   local notes_file="$6"
-  local -n _checksums="$7"
+  local vendor_checksums_name="$7"
+  local crates_tarball="$8"
+  local crates_checksums_name="$9"
 
   # Open notes file for writing with a file descriptor
   exec {fd}>> "${notes_file}"
@@ -198,10 +202,14 @@ generate_release_notes() {
   esac
 
   # Add checksums
-  write_checksum_notes _checksums
+  write_checksum_notes "vendored tarball" "$vendor_checksums_name"
+  if [[ -n ${crates_tarball} ]]; then
+    printf "\n" >&${fd}
+    write_checksum_notes "crates tarball" "$crates_checksums_name"
+  fi
 
   # Use printf with strftime-style formatting (%(... )T) to insert current UTC timestamp
-  printf "\n---\nGenerated: %(%Y-%m-%d %H:%M:%S UTC)T\n" >&${fd}
+  TZ=UTC printf "\n---\nGenerated: %(%Y-%m-%d %H:%M:%S UTC)T\n" -1 >&${fd}
 
   # Close the file descriptor since we're done
   exec {fd}>&-
@@ -213,17 +221,30 @@ create_github_release() {
   local tag="$3"
   local build_type="$4"
   local notes_file="$5"
-  local -n _checksums="$6"
+  local vendor_checksums_name="$6"
+  local crates_tarball="$7"
+  local crates_checksums_name="$8"
+  local -n _vendor_checksums="$vendor_checksums_name"
+  local -n _crates_checksums="$crates_checksums_name"
 
   local release_tag="${name}-${tag}"
   local title="[${build_type}] ${name} ${tag}"
-  local -a checksum_files
+  local -a files=("${tarball_path}")
 
-  for file in "${_checksums[@]}"; do
+  for file in "${_vendor_checksums[@]}"; do
     if [[ -r ${file} ]]; then
-      checksum_files+=("${file}")
+      files+=("${file}")
     fi
   done
+
+  if [[ -n ${crates_tarball} ]]; then
+    files+=("${crates_tarball}")
+    for file in "${_crates_checksums[@]}"; do
+      if [[ -r ${file} ]]; then
+        files+=("${file}")
+      fi
+    done
+  fi
 
   logging::log_info "Creating release: ${release_tag}"
 
@@ -232,11 +253,11 @@ create_github_release() {
     --title "${title}" \
     --notes-file "${notes_file}" \
     --target "${GITHUB_SHA:-HEAD}" \
-    "${tarball_path}" "${checksum_files[@]}"
+    "${files[@]}"
 }
 
 main() {
-  if (($# != 6)); then
+  if (( $# < 6 || $# > 7 )); then
     logging::log_error "Invalid number of arguments: $#"
     usage
   fi
@@ -247,10 +268,14 @@ main() {
   local vcs="$4"
   local build_type="$5"
   local language="$6"
+  local crates_tarball_path="${7:-}"
 
   # Validate inputs
   if [[ ! -f ${tarball_path} ]]; then
     logging::log_fatal "Tarball not found: ${tarball_path}"
+  fi
+  if [[ -n ${crates_tarball_path} && ! -f ${crates_tarball_path} ]]; then
+    logging::log_fatal "Crates tarball not found: ${crates_tarball_path}"
   fi
 
   if [[ ! ${build_type} =~ ^(vendored|preemptive)$ ]]; then
@@ -264,20 +289,24 @@ main() {
   check_dependencies
 
   # Generate checksums
-  local -A checksums
-  compute_checksums "$tarball_path" checksums
+  local -A vendor_checksums
+  compute_checksums "$tarball_path" vendor_checksums
+  local -A crates_checksums
+  if [[ -n ${crates_tarball_path} ]]; then
+    compute_checksums "$crates_tarball_path" crates_checksums
+  fi
 
   # Generate release notes
   local notes_file
   notes_file="$(mktemp release_notes.txt.XXXXXX)"
 
-  generate_release_notes "${name}" "${tag}" "${vcs}" "${build_type}" "${language}" "${notes_file}" checksums
+  generate_release_notes "${name}" "${tag}" "${vcs}" "${build_type}" "${language}" "${notes_file}" vendor_checksums "${crates_tarball_path}" crates_checksums
 
   # Create the release
-  create_github_release "${tarball_path}" "${name}" "${tag}" "${build_type}" "${notes_file}" checksums
+  create_github_release "$tarball_path" "$name" "$tag" "$build_type" "$notes_file" vendor_checksums "${crates_tarball_path}" crates_checksums
 
   # Cleanup
-  rm -f -- "${notes_file}"
+  rm -f -- "$notes_file"
 
   logging::log_info "Release created successfully: ${name}-${tag}"
 }

@@ -28,14 +28,22 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          working-directory: scripts/
+
       - name: Clone ebuild overlay repo
         run: |
           gh repo clone peppapig450/nicks_repo ebuilds -- --depth=1
 
       - name: Generate ebuild index from overlay
         run: |
-          pip3 install packaging
-          python3 scripts/generate_ebuild_index.py -o ebuild_index.json ebuilds
+          uv run --project scripts \
+            --group generate-ebuild-index \
+            --frozen \
+            --no-dev \
+            scripts/generate_ebuild_index.py -o ebuild_index.json ebuilds
 
       - name: List existing release tags
         id: list-released-tags
@@ -74,27 +82,57 @@ jobs:
         with:
           language: ${{ matrix.language }}
 
-      - name: Build tarball
+      - name: Build vendor tarball
         id: build
+        shell: bash
         run: |
-          tarball="$(jq -n \
+          mapfile -t lines < <(jq -n \
             --arg name "${{ matrix.name }}" \
             --arg repo "${{ matrix.repo }}" \
             --arg vcs "${{ matrix.vcs }}" \
             --arg tag "${{ matrix.tag }}" \
             --arg subdir "${{ matrix.subdir }}" \
             '{name: $name, repo: $repo, vcs: $vcs, tag: $tag, subdir: $subdir}' \
-            | bash ci/build-"${{ matrix.language }}"-deps.sh)"
-          echo "tarball=${tarball}" >> $GITHUB_OUTPUT
+            | bash ci/build-"${{ matrix.language }}"-deps.sh)
+
+          echo "vendored_tarball=${lines[0]}" >> $GITHUB_OUTPUT
+          if [[ "${{ matrix.language }}" == "rust" ]]; then
+            echo "base_dir=${lines[1]}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup uv (Rust only)
+        if: matrix.language == 'rust'
+        uses: astral-sh/setup-uv@v6
+        with:
+          working-directory: scripts/
+
+      - name: Create crates tarball (Rust only)
+        if: matrix.language == 'rust'
+        id: crates
+        run: |
+          VERSION="${{ matrix.tag }}"
+          VERSION="${VERSION#v}"
+          CRATES_TARBALL="${{ matrix.name }}-${VERSION}-crates.tar.xz"
+
+          uv run --project scripts \
+            --group vendor-crates \
+            --frozen \
+            --no-dev \
+            scripts/vendor_crates.py \
+              -o "$CRATES_TARBALL" \
+              "${{ steps.build.outputs.base_dir }}"
+
+          echo "crates_tarball=$CRATES_TARBALL" >> $GITHUB_OUTPUT
 
       - name: Create vendored release
         run: |
           bash ci/create-release.sh \
-            "${{ steps.build.outputs.tarball }}" \
+            "${{ steps.build.outputs.vendored_tarball }}" \
             "${{ matrix.name }}" \
             "${{ matrix.tag }}" \
             "${{ matrix.vcs }}" \
             "${{ matrix.build_type }}" \
-            "${{ matrix.language }}"
+            "${{ matrix.language }}" \
+            "${{ steps.crates.outputs.crates_tarball || '' }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
