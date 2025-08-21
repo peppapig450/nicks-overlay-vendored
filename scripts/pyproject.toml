@@ -4,13 +4,15 @@ version = "0.1.0"
 description = "Python scripts for vendoring ebuild dependencies"
 authors = [{ name = "peppapig450", email = "peppapig450@pm.me" }]
 requires-python = ">=3.13"
-dependencies = [
+
+[dependency-groups]
+vendor-crates = [
     "aiohttp>=3.12.15,<4.0.0",
     "aiolimiter>=1.2.1,<2.0.0",
-    "packaging>=25.0,<26.0",
     "pycargoebuild>=0.15.0,<0.16.0",
     "uvloop>=0.21.0,<0.22.0",
 ]
 
-[dependency-groups]
+generate-ebuild-index = ["packaging>=25.0,<26.0"]
+
 dev = ["mypy >=1.17.1,<2", "ruff >=0.12.9,<1"]
