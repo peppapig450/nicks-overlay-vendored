@@ -23,7 +23,8 @@
             "name": "lutgen-rs",
             "repo": "ozwaldorf/lutgen-rs",
             "vcs": "https://github.com/ozwaldorf/lutgen-rs",
-            "preemptive_count": 1
+            "preemptive_count": 1,
+            "subdir": "crates/cli"
         },
         {
             "name": "whiskers",
