@@ -61,7 +61,8 @@
             "name": "spotify-player",
             "repo": "aome510/spotify-player",
             "vcs": "https://github.com/aome510/spotify-player",
-            "preemptive_count": 1
+            "preemptive_count": 1,
+            "subdir": "spotify_player"
         },
         {
             "name": "riff",
