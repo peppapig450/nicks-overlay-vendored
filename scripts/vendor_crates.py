@@ -209,8 +209,7 @@ def fetch_crates_using_aiohttp(crates: Iterable[Crate], *, distdir: Path) -> Non
 
                 destination = distdir / filename
                 if destination.exists() and destination.stat().st_size > 0:
-                    if logger.isEnabledFor(logging.INFO):
-                        logger.warning("Skipping existing crate %s", filename)
+                    logger.info("Skipping existing crate %s (already present)", filename)
                     return  # Already present, verification will run later
 
                 url = crate.download_url
@@ -313,6 +312,9 @@ def fetch_crates(crates: Iterable[Crate], *, distdir: Path) -> None:
     raise RuntimeError(f"No supported fetcher found (tried {', '.join(FETCHERS)})")
 
 
+# TODO: switching to zstd might be beneficial here, we can utilize uv to install python 3.14, which
+# has zstd support in the stdlib. for a massive amount of crates (800+), xz takes obscenely long
+# which makes something like zstd -13 or -19 (maybe) much more appealing.
 def repack_crates(crates: set[Crate], *, distdir: Path, tarball: Path, prefix: str) -> None:
     """Repack fetched crates into a tarball."""
     # discover current umask without changing it
@@ -358,7 +360,7 @@ def repack_crates(crates: set[Crate], *, distdir: Path, tarball: Path, prefix: s
                         _add_crate_to_tar(crate, distdir=distdir, tar_out=tar_out, prefix=prefix)
 
                         end_time = dt.datetime.now(dt.UTC)
-                        logging.info("Time elapsed during repacking: %s", end_time - start_time)
+                        logging.debug("Time elapsed during repacking: %s", end_time - start_time)
         except BaseException:
             Path(tmp_file.name).unlink(missing_ok=True)
             raise
@@ -403,7 +405,15 @@ def build_parser() -> argparse.ArgumentParser:
         default="cargo_home/gentoo",
         help="Prefix for paths stored inside the tarball",
     )
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Shorthand for --log-level=DEBUG"
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default=None,
+        help="Explicit logging level (overrides CI auto-detection and -v)",
+    )
 
     return parser
 
@@ -415,6 +425,7 @@ class Args:
     output: str
     prefix: str
     verbose: bool
+    log_level: str | None = None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -422,10 +433,28 @@ def main(argv: list[str] | None = None) -> int:
     raw_args = parser.parse_args()
     args = Args(**vars(raw_args))
 
-    logging.basicConfig(
-        level=logging.INFO if args.verbose else logging.WARNING,
-        format="%(levelname)s: %(message)s",
-    )
+    # Determine log level: explicit flag -> -v -> LOG_LEVEL env -> CI auto -> WARNING
+    env_level = os.getenv("LOG_LEVEL")
+    if args.log_level:
+        level_name = args.log_level
+    elif args.verbose:
+        level_name = "DEBUG"
+    elif env_level:
+        level_name = env_level
+    # We only support GITHUB_ACTIONS detection for now since it's what we use
+    elif os.getenv("GITHUB_ACTIONS"):
+        level_name = "INFO"
+    else:
+        level_name = "WARNING"
+
+    try:
+        level = getattr(logging, level_name.upper())
+    except Exception:
+        level = logging.WARNING
+
+    log_format = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+    datefmt = "%Y-%m-%dT%H:%M:%S%z"
+    logging.basicConfig(level=level, format=log_format, datefmt=datefmt)
 
     crates: set[Crate] = set()
     pkg_metadata = None
