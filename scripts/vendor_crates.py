@@ -56,7 +56,7 @@ from pycargoebuild.fetch import (  # type: ignore[import-untyped]
 
 uvloop.install()
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("crate_vendoring")
 
 FETCHERS = ("aiohttp", "aria2", "wget")
 
@@ -217,7 +217,12 @@ def fetch_crates_using_aiohttp(crates: Iterable[Crate], *, distdir: Path) -> Non
                 backoff = 0.5
 
                 for attempt in range(1, retries + 1):
-                    logger.info("Starting download of %s (attempt %d)", filename, attempt)
+                    logger.info(
+                        "Starting download of %s (attempt %d)",
+                        filename,
+                        attempt,
+                        extra={"phase": "download"},
+                    )
                     try:
                         async with (
                             semaphore,
@@ -245,7 +250,12 @@ def fetch_crates_using_aiohttp(crates: Iterable[Crate], *, distdir: Path) -> Non
                             os.replace(
                                 temp_file, destination
                             )  # Atomically replace on POSIX/windows
-                            logger.info("Finished download of %s (attempt %d)", filename, attempt)
+                            logger.info(
+                                "Finished download of %s (attempt %d)",
+                                filename,
+                                attempt,
+                                extra={"phase": "download"},
+                            )
                             return
 
                     except asyncio.CancelledError:
@@ -344,14 +354,19 @@ def repack_crates(crates: set[Crate], *, distdir: Path, tarball: Path, prefix: s
                     start_time = dt.datetime.now(dt.UTC)
                     next_ping = start_time + dt.timedelta(seconds=10)
 
-                    logging.info("Repacking %d crates", total_crates)
+                    logging.info("Repacking %d crates", total_crates, extra={"phase": "repack"})
 
                     for idx, crate in enumerate(
                         sorted(crates, key=lambda crate: crate.filename), 1
                     ):
                         current_time = dt.datetime.now(dt.UTC)
                         if current_time >= next_ping:
-                            logging.info("Processed %d/%d crates", idx - 1, total_crates)
+                            logging.info(
+                                "Processed %d/%d crates",
+                                idx - 1,
+                                total_crates,
+                                extra={"phase": "repack"},
+                            )
                             next_ping = current_time + dt.timedelta(seconds=10)
 
                         if not isinstance(crate, FileCrate):
@@ -360,7 +375,11 @@ def repack_crates(crates: set[Crate], *, distdir: Path, tarball: Path, prefix: s
                         _add_crate_to_tar(crate, distdir=distdir, tar_out=tar_out, prefix=prefix)
 
                         end_time = dt.datetime.now(dt.UTC)
-                        logging.debug("Time elapsed during repacking: %s", end_time - start_time)
+                        logging.debug(
+                            "Time elapsed during repacking: %s",
+                            end_time - start_time,
+                            extra={"phase": "repack"},
+                        )
         except BaseException:
             Path(tmp_file.name).unlink(missing_ok=True)
             raise
@@ -373,6 +392,7 @@ def repack_crates(crates: set[Crate], *, distdir: Path, tarball: Path, prefix: s
         total_crates,
         tarball,
         end_time - start_time,
+        extra={"phase": "repack"},
     )
 
 
@@ -428,6 +448,13 @@ class Args:
     log_level: str | None = None
 
 
+class PhaseFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        phase = getattr(record, "phase", None)
+        record.phase_display = f":{phase}" if phase else ""
+        return True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     raw_args = parser.parse_args()
@@ -452,9 +479,11 @@ def main(argv: list[str] | None = None) -> int:
     except Exception:
         level = logging.WARNING
 
-    log_format = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+    log_format = "%(asctime)s %(levelname)s [%(name)s%(phase_display)s]: %(message)s"
     datefmt = "%Y-%m-%dT%H:%M:%S%z"
+
     logging.basicConfig(level=level, format=log_format, datefmt=datefmt)
+    logging.getLogger().addFilter(PhaseFilter())
 
     crates: set[Crate] = set()
     pkg_metadata = None
