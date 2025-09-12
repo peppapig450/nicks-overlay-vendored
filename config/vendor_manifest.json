@@ -69,6 +69,12 @@
             "repo": "Diegovsky/riff",
             "vcs": "https://github.com/Diegovsky/riff",
             "preemptive_count": 1
+        },
+        {
+            "name": "swww",
+            "repo": "LGFae/swww",
+            "vcs": "https://github.com/LGFae/swww",
+            "preemptive_count": 1
         }
     ]
 }
