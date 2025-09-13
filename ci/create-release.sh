@@ -300,10 +300,27 @@ main() {
   local notes_file
   notes_file="$(mktemp release_notes.txt.XXXXXX)"
 
-  generate_release_notes "${name}" "${tag}" "${vcs}" "${build_type}" "${language}" "${notes_file}" vendor_checksums "${crates_tarball_path}" crates_checksums
+  generate_release_notes \
+    "$name" \
+    "$tag" \
+    "$vcs" \
+    "$build_type" \
+    "$language" \
+    "$notes_file" \
+    vendor_checksums \
+    "$crates_tarball_path" \
+    crates_checksums
 
   # Create the release
-  create_github_release "$tarball_path" "$name" "$tag" "$build_type" "$notes_file" vendor_checksums "${crates_tarball_path}" crates_checksums
+  create_github_release \
+    "$tarball_path" \
+    "$name" \
+    "$tag" \
+    "$build_type" \
+    "$notes_file" \
+    vendor_checksums \
+    "$crates_tarball_path" \
+    crates_checksums
 
   # Cleanup
   rm -f -- "$notes_file"
