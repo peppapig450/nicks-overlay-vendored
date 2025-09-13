@@ -14,3 +14,16 @@ updates:
       - "github-actions"
     assignees:
       - peppapig450
+
+  - package-ecosystem: "uv"
+    directory: /scripts
+    schedule:
+      interval: "daily"
+    commit-message:
+      include: scope
+      prefix: chore
+    labels:
+      - "dependencies"
+      - "python"
+    assignees:
+      - peppapig450
