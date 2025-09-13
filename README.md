@@ -21,6 +21,10 @@ The optional `subdir` path is relative to the repository root and tells the
 build scripts where to run vendoring commands. Leave it empty when dependencies
 are fetched from the repository root.
 
+Rust packages may also include an optional `build_crates` boolean, which
+defaults to `true`. Set `"build_crates": false` to skip creating an additional
+crates tarball for a package.
+
 ## Building tarballs
 
 Language specific scripts in `ci/` can be used to create dependency tarballs locally:

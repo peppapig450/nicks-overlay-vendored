@@ -24,57 +24,66 @@
             "repo": "ozwaldorf/lutgen-rs",
             "vcs": "https://github.com/ozwaldorf/lutgen-rs",
             "preemptive_count": 1,
-            "subdir": "crates/cli"
+            "subdir": "crates/cli",
+            "build_crates": true
         },
         {
             "name": "whiskers",
             "repo": "catppuccin/whiskers",
             "vcs": "https://github.com/catppuccin/whiskers",
-            "preemptive_count": 1
+            "preemptive_count": 1,
+            "build_crates": true
         },
         {
             "name": "raffi",
             "repo": "chmouel/raffi",
             "vcs": "https://github.com/chmouel/raffi",
-            "preemptive_count": 1
+            "preemptive_count": 1,
+            "build_crates": true
         },
         {
             "name": "BLAKE3",
             "repo": "BLAKE3-team/BLAKE3",
             "vcs": "https://github.com/BLAKE3-team/BLAKE3",
             "preemptive_count": 1,
-            "subdir": "b3sum"
+            "subdir": "b3sum",
+            "build_crates": true
         },
         {
             "name": "eza",
             "repo": "eza-community/eza",
             "vcs": "https://github.com/eza-community/eza",
-            "preemptive_count": 2
+            "preemptive_count": 2,
+            "build_crates": true
         },
         {
             "name": "rasusa",
             "repo": "mbhall88/rasusa",
             "vcs": "https://github.com/mbhall88/rasusa",
-            "preemptive_count": 1
+            "preemptive_count": 1,
+            "build_crates": true
         },
         {
             "name": "spotify-player",
             "repo": "aome510/spotify-player",
             "vcs": "https://github.com/aome510/spotify-player",
             "preemptive_count": 1,
-            "subdir": "spotify_player"
+            "subdir": "spotify_player",
+            "build_crates": true
         },
         {
             "name": "riff",
             "repo": "Diegovsky/riff",
             "vcs": "https://github.com/Diegovsky/riff",
-            "preemptive_count": 1
+            "preemptive_count": 1,
+            "build_crates": true
         },
         {
             "name": "swww",
             "repo": "LGFae/swww",
             "vcs": "https://github.com/LGFae/swww",
-            "preemptive_count": 1
+            "preemptive_count": 1,
+            "build_crates": false
         }
     ]
 }

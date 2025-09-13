@@ -66,7 +66,11 @@ jobs:
             exit 1
           fi
 
-          jq -r '"repo=" + .repo, "vcs=" + .vcs, "subdir=" + (.subdir // "")' <<< "$config_entry" >> "$GITHUB_OUTPUT"
+          jq -r '"repo=" + .repo,
+            "vcs=" + .vcs,
+            "subdir=" + (.subdir // ""),
+            "build_crates=" + (if .build_crates == null then "true" else (.build_crates|tostring) end)' \
+            <<< "$config_entry" >> "$GITHUB_OUTPUT"
 
           release_tag="${package_name}-${tag_version}"
           if [[ "${{ inputs.force_build }}" != "true" ]]; then
@@ -95,13 +99,13 @@ jobs:
           fi
 
       - name: Setup uv (Rust only)
-        if: inputs.language == 'rust'
+        if: inputs.language == 'rust' && steps.validate.outputs.build_crates == 'true'
         uses: astral-sh/setup-uv@v6
         with:
           working-directory: scripts/
 
       - name: Create crates tarball (Rust only)
-        if: inputs.language == 'rust'
+        if: inputs.language == 'rust' && steps.validate.outputs.build_crates == 'true'
         id: crates
         run: |
           VERSION="${{ inputs.tag_version }}"

@@ -77,6 +77,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Dump matrix values
+        run: |
+          echo "Full matrix values:"
+          echo '${{ toJSON(matrix) }}'
+
       - name: Setup language environment
         uses: ./.github/actions/setup-language
         with:
@@ -101,13 +106,13 @@ jobs:
           fi
 
       - name: Setup uv (Rust only)
-        if: matrix.language == 'rust'
+        if: ${{ (matrix.language == 'rust') && (matrix.build_crates) }}
         uses: astral-sh/setup-uv@v6
         with:
           working-directory: scripts/
 
       - name: Create crates tarball (Rust only)
-        if: matrix.language == 'rust'
+        if: ${{ (matrix.language == 'rust') && (matrix.build_crates) }}
         id: crates
         run: |
           VERSION="${{ matrix.tag }}"
