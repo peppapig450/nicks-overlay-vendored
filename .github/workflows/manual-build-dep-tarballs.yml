@@ -100,7 +100,7 @@ jobs:
 
       - name: Setup uv (Rust only)
         if: inputs.language == 'rust' && steps.validate.outputs.build_crates == 'true'
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           working-directory: scripts/
 
