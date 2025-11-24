@@ -1,4 +1,4 @@
 [submodule "scripts/lib/logging"]
 	path = scripts/lib/logging
-	url = https://github.com/peppapig450/bashing-logs.git
+	url = https://github.com/peppapig450/bashlog.git
 	branch = main
