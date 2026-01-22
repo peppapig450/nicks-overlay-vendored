@@ -13,6 +13,6 @@ vendor-crates = [
     "uvloop>=0.21.0,<0.23.0",
 ]
 
-generate-ebuild-index = ["packaging>=25.0,<26.0"]
+generate-ebuild-index = ["packaging>=25.0,<27.0"]
 
 dev = ["mypy >=1.17.1,<2", "ruff >=0.12.9,<1"]
