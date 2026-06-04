@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 
 [dependency-groups]
 vendor-crates = [
-    "aiohttp>=3.12.15,<4.0.0",
+    "aiohttp>=3.14.0,<4.0.0",
     "aiolimiter>=1.2.1,<2.0.0",
     "pycargoebuild>=0.15.0,<0.16.0",
     "uvloop>=0.21.0,<0.23.0",
