@@ -15,4 +15,4 @@ vendor-crates = [
 
 generate-ebuild-index = ["packaging>=26.2,<27.0"]
 
-dev = ["mypy >=1.17.1,<2", "ruff>=0.15.15,<1"]
+dev = ["mypy >=1.17.1,<2", "ruff>=0.15.17,<1"]
