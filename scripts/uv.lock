@@ -405,15 +405,15 @@ wheels = [
 
 [[package]]
 name = "pycargoebuild"
-version = "0.15.1"
+version = "0.15.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinja2" },
     { name = "license-expression" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/37/710bc5524ccb9d44ae4dd594dfc4794dbee26dcf656f1226028bb0796677/pycargoebuild-0.15.1.tar.gz", hash = "sha256:22915aa2db5ad2b73410c59912396f32045a9fb5fb516116f74f5a814ff08ed4", size = 59440, upload-time = "2025-12-29T17:48:11.518Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/be/b7d2458d36d65e1d5207d929cf0fae5ac443fb213f5c9bde2146345e24c0/pycargoebuild-0.15.3.tar.gz", hash = "sha256:b186d4e5ca3397f23cb74c83270ae5acb509ecb45145e89eab1e3f2e398ee413", size = 59741, upload-time = "2026-06-15T15:02:23.099Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/48/ea8db101566b5a449884bfd9f2ead462efdbe3a80a423ad8e648e3ed79be/pycargoebuild-0.15.1-py3-none-any.whl", hash = "sha256:690662d4370657db94fcbb9123387d56c3e8d78c9bce4e73f6b66781c5377f99", size = 27743, upload-time = "2025-12-29T17:47:54.791Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/8c/754a3d1f33a72140e49306cb7663f9c30fc173f745a76356af45ebb53638/pycargoebuild-0.15.3-py3-none-any.whl", hash = "sha256:f2d704b1dcac5415486e7877dd819e40babcf189a5379eca50f5db4147ac1190", size = 27807, upload-time = "2026-06-15T15:02:21.717Z" },
 ]
 
 [[package]]
@@ -507,7 +507,7 @@ generate-ebuild-index = [{ name = "packaging", specifier = ">=26.2,<27.0" }]
 vendor-crates = [
     { name = "aiohttp", specifier = ">=3.12.15,<4.0.0" },
     { name = "aiolimiter", specifier = ">=1.2.1,<2.0.0" },
-    { name = "pycargoebuild", specifier = ">=0.15.0,<0.16.0" },
+    { name = "pycargoebuild", specifier = ">=0.15.3,<0.16.0" },
     { name = "uvloop", specifier = ">=0.21.0,<0.23.0" },
 ]
 
